@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=70.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hybrid_tasks"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mjlab",
+    "rsl-rl-lib",
+]
+
+[tool.uv.workspace]
+members = [
+    "external/rsl_rl",
+    "external/mjlab",
+]
+[tool.ruff]
+src = ["hybrid_tasks"]  # Helpful for recognizing first-party imports.
+indent-width = 4
+exclude = [
+  "external"
+]
+
+[tool.uv.sources]
+rsl-rl-lib = { workspace = true, editable = true }
+mjlab = { workspace = true, editable = true }
+
+[tool.uv]
+override-dependencies = ["mujoco==3.4.0"]
+exclude-dependencies = ["robot_menagerie"]
+package = true
+
+[project.scripts]
+train = "hybrid_tasks.scripts.train:main"
+play = "hybrid_tasks.scripts.play:main"
+
+[tool.setuptools]
+packages = ["hybrid_tasks"]
+
+[tool.ty.environment]
+extra-paths = ["./external/mjlab", "./external/rsl_rl"]
+python = "./.venv"
