@@ -4,43 +4,77 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hybrid_tasks"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
+version = "1.0.0"
+
+keywords = ["Hybrid control"]
+maintainers = [
+  { name="Gleb Stoyko", email="stojko.g@yandex.ru" },
+]
+authors = [
+]
+description = "Hybrid tasks for mjlab"
+readme = { file = "README.md", content-type = "text/markdown"}
+license = { text = "BSD-3-Clause" }
+
 requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "mjlab",
-    "rsl-rl-lib",
+    "mjlab==1.3.0",
+    "rsl-rl-lib==5.0.1",
 ]
 
-[tool.uv.workspace]
-members = [
-    "external/rsl_rl",
-    "external/mjlab",
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hybrid_tasks*"]
+
+[tool.isort]
+
+py_version = 38
+line_length = 120
+group_by_package = true
+
+# Files to skip
+skip_glob = [".vscode/*"]
+
+# Order of imports
+sections = [
+    "FUTURE",
+    "STDLIB",
+    "THIRDPARTY",
+    "FIRSTPARTY",
+    "LOCALFOLDER",
 ]
-[tool.ruff]
-src = ["hybrid_tasks"]  # Helpful for recognizing first-party imports.
-indent-width = 4
-exclude = [
-  "external"
+
+# Extra standard libraries considered as part of python (permissive licenses)
+extra_standard_library = [
+    "numpy",
+    "torch",
+    "tensordict",
+    "warp",
+    "typing_extensions",
+    "git",
 ]
+# Imports from this repository
+known_first_party = "hybrid_tasks"
 
-[tool.uv.sources]
-rsl-rl-lib = { workspace = true, editable = true }
-mjlab = { workspace = true, editable = true }
+[tool.pyright]
 
-[tool.uv]
-override-dependencies = ["mujoco==3.4.0"]
-exclude-dependencies = ["robot_menagerie"]
-package = true
+include = ["hybrid_tasks"]
 
-[project.scripts]
-train = "hybrid_tasks.scripts.train:main"
-play = "hybrid_tasks.scripts.play:main"
+typeCheckingMode = "basic"
+pythonVersion = "3.10"
+pythonPlatform = "Linux"
+enableTypeIgnoreComments = true
 
-[tool.setuptools]
-packages = ["hybrid_tasks"]
+# This is required as the CI pre-commit does not download the module (i.e. numpy, torch, prettytable)
+# Therefore, we have to ignore missing imports
+reportMissingImports = "none"
+# This is required to ignore for type checks of modules with stubs missing.
+reportMissingModuleSource = "none" # -> most common: prettytable in mdp managers
 
-[tool.ty.environment]
-extra-paths = ["./external/mjlab", "./external/rsl_rl"]
-python = "./.venv"
+reportGeneralTypeIssues = "none"       # -> raises 218 errors (usage of literal MISSING in dataclasses)
+reportOptionalMemberAccess = "warning" # -> raises 8 errors
+reportPrivateUsage = "warning"
