@@ -1,1 +1,5 @@
 logs
+__pycache__
+hybrid_tasks.egg-info
+MUJOCO_LOG.TXT
+wandb
