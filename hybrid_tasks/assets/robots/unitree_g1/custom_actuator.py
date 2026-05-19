@@ -204,7 +204,7 @@ class XmlCustomActuator(XmlActuator):
     q_err = q_des - q_cur
     dq_err = -dq_cur #dq_des - dq_cur
 
-    raw_torques = self.kp * q_err + self.kd * dq_err
+    raw_torques = cmd.effort_target + self.kp * q_err + self.kd * dq_err
 
     # --- определяем режим: motoring / braking ---
     motoring_mask = (dq_cur * raw_torques) > 1e-6

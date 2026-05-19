@@ -115,7 +115,7 @@ FEET_ONLY_COLLISION = CollisionCfg(
   friction=(0.6,),
 )
 
-def get_g1_robot_cfg() -> EntityCfg:
+def get_g1_robot_cfg_custom() -> EntityCfg:
   """Get a fresh G1 robot configuration instance.
 
   Returns a new EntityCfg instance each time to avoid mutation issues when
@@ -129,13 +129,13 @@ def get_g1_robot_cfg() -> EntityCfg:
   )
 
 
-G1_ACTION_SCALE: dict[str, float] = {}
+G1_ACTION_SCALE_CUSTOM: dict[str, float] = {}
 for actuator_name, actuator_type in MATCHING_DICT.items():
   assert isinstance(actuator_type, CustomActuator)
   e = actuator_type.effort_limit
   s = actuator_type.stiffness
   assert e is not None
-  G1_ACTION_SCALE[actuator_name] = 0.25 * e / s
+  G1_ACTION_SCALE_CUSTOM[actuator_name] = 0.25 * e / s
 
 
 if __name__ == "__main__":
@@ -143,6 +143,6 @@ if __name__ == "__main__":
 
   from mjlab.entity.entity import Entity
 
-  robot = Entity(get_g1_robot_cfg())
+  robot = Entity(get_g1_robot_cfg_custom())
 
   viewer.launch(robot.spec.compile())
