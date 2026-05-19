@@ -9,9 +9,6 @@ from hybrid_tasks.tasks.velocity.vanlilla_walk_flat import (
 )
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
-from mjlab.managers.reward_manager import RewardTermCfg
-from mjlab.managers.scene_entity_config import SceneEntityCfg
-from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 
 
@@ -89,12 +86,7 @@ def g1_vanilla_walk_flat_env_cfg(
   cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("torso_link",)
   cfg.rewards["foot_clearance"].params["asset_cfg"].site_names = site_names
   cfg.rewards["foot_slip"].params["asset_cfg"].site_names = site_names
-  cfg.rewards["self_collisions"] = RewardTermCfg(
-    func=mdp.self_collision_cost,
-    weight=-1.0,
-    params={"sensor_name": "self_collision", "force_threshold": 10.0},
-  )
-
+  
   if play:
     cfg.episode_length_s = int(1e9)
     cfg.observations["actor"].enable_corruption = False

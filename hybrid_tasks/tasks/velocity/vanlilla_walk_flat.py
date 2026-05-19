@@ -355,6 +355,11 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
         "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
       },
     ),
+    "self_collisions": RewardTermCfg(
+      func=mdp.self_collision_cost,
+      weight=-1.0,
+      params={"sensor_name": "self_collision", "force_threshold": 10.0},
+    ),
   }
 
   ##
