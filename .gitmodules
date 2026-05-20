@@ -4,3 +4,15 @@
 [submodule "external/mjlab"]
 	path = external/mjlab
 	url = https://github.com/mujocolab/mjlab.git
+[submodule "external/cyclonedds"]
+	path = external/cyclonedds
+	url = git@github.com:eclipse-cyclonedds/cyclonedds.git
+[submodule "external/unitree_mujoco"]
+	path = external/unitree_mujoco
+	url = git@github.com:unitreerobotics/unitree_mujoco.git
+[submodule "external/unitree_sdk2"]
+	path = external/unitree_sdk2
+	url = git@github.com:unitreerobotics/unitree_sdk2.git
+[submodule "external/unitree_sdk2_python"]
+	path = external/unitree_sdk2_python
+	url = git@github.com:unitreerobotics/unitree_sdk2_python.git
