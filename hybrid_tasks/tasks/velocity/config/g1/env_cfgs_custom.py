@@ -2,6 +2,8 @@
 
 from hybrid_tasks.assets.robots import (
   G1_ACTION_SCALE_CUSTOM,
+  GAIT_PERIOD, GAIT_OFFSET, GAIT_THRESHOLD,
+  FOOT_CLEARANCE,
   get_g1_robot_cfg_custom,
 )
 from hybrid_tasks.tasks.velocity.vanlilla_walk_flat import (
@@ -86,6 +88,12 @@ def g1_vanilla_walk_flat_env_cfg(
   cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("torso_link",)
   cfg.rewards["foot_clearance"].params["asset_cfg"].site_names = site_names
   cfg.rewards["foot_slip"].params["asset_cfg"].site_names = site_names
+
+  cfg.rewards["foot_gait"].params["period"] = GAIT_PERIOD
+  cfg.rewards["foot_gait"].params["offset"] = GAIT_OFFSET
+  cfg.rewards["foot_gait"].params["threshold"] = GAIT_THRESHOLD
+
+  cfg.rewards["foot_clearance"].params["target_height"] = FOOT_CLEARANCE
   
   if play:
     cfg.episode_length_s = int(1e9)
