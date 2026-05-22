@@ -6,13 +6,8 @@ from hybrid_tasks.assets.robots import DEFAULT_JOINT_POS_NP as DEFAULT_JOINT_POS
 from hybrid_tasks.assets.robots import ACTION_SCALE_NP as ACTION_SCALE
 
 class SimpleController:
-    def __init__(self, policy_path, dt=None, device="cpu"): # dt doesn't use
-        self.device = device
+    def __init__(self, policy_path, dt=None): # dt doesn't use
         self.session = ort.InferenceSession(policy_path, providers=["CPUExecutionProvider"])
-
-        inputs = self.session.get_inputs()
-        self.input_name = inputs[0].name
-        self.output_names = [output.name for output in self.session.get_outputs()]
 
         self.initialized = False
 
@@ -31,7 +26,7 @@ class SimpleController:
             obs = obs[None, :]
 
         obs = obs.astype(np.float32)
-        action = self.session.run(self.output_names, {self.input_name: obs})[0]
+        action = self.session.run(None, {"obs": obs})[0]
 
         if action.ndim == 2 and action.shape[0] == 1:
             action = action[0]
