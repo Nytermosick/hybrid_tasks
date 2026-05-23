@@ -2,7 +2,7 @@
 
 from hybrid_tasks.assets.robots import (
   G1_ACTION_SCALE_CUSTOM,
-  GAIT_PERIOD, GAIT_OFFSET, GAIT_THRESHOLD,
+  GAIT_PERIOD, GAIT_OFFSET, GAIT_THRESHOLD, COMMAND_STANDING_THRESHOLD,
   FOOT_CLEARANCE,
   get_g1_robot_cfg_custom,
 )
@@ -12,6 +12,9 @@ from hybrid_tasks.tasks.velocity.vanlilla_walk_flat import (
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+from hybrid_tasks.tasks.velocity.custom_residual_action import (
+  ResidualPositionsAndTorquesCfg,
+)
 
 
 def g1_vanilla_walk_flat_env_cfg(
@@ -40,6 +43,7 @@ def g1_vanilla_walk_flat_env_cfg(
   cfg.observations["critic"].terms["foot_height"].params[
     "asset_cfg"
   ].site_names = site_names
+  cfg.observations["actor"].terms["gait_phase"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
 
   cfg.events["foot_friction"].params["asset_cfg"].geom_names = geom_names
   cfg.events["base_com"].params["asset_cfg"].body_names = ("torso_link",)
@@ -92,6 +96,7 @@ def g1_vanilla_walk_flat_env_cfg(
   cfg.rewards["foot_gait"].params["period"] = GAIT_PERIOD
   cfg.rewards["foot_gait"].params["offset"] = GAIT_OFFSET
   cfg.rewards["foot_gait"].params["threshold"] = GAIT_THRESHOLD
+  cfg.rewards["foot_gait"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
 
   cfg.rewards["foot_clearance"].params["target_height"] = FOOT_CLEARANCE
   
@@ -104,5 +109,18 @@ def g1_vanilla_walk_flat_env_cfg(
     twist_cmd.ranges.lin_vel_x = (-1.0, 2.0)
     twist_cmd.ranges.lin_vel_y = (-1.0, 1.0)
     twist_cmd.ranges.ang_vel_z = (-1.5, 1.5)
+
+  return cfg
+
+
+def g1_qp_without_acc_walk_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 flat walking configuration with QP torques without acceleration in the policy."""
+  cfg = g1_vanilla_walk_flat_env_cfg(play=play)
+
+  joint_pos_action = cfg.actions["joint_pos"]
+  assert isinstance(joint_pos_action, ResidualPositionsAndTorquesCfg)
+  joint_pos_action.use_qp_torques = True
 
   return cfg

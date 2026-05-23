@@ -7,8 +7,12 @@ from .env_cfgs import (
 )
 from .rl_cfg import unitree_g1_ppo_runner_cfg
 
-from .rl_cfgs_custom import g1_vanilla_ppo_runner_cfg
-from .env_cfgs_custom import g1_vanilla_walk_flat_env_cfg
+from .rl_cfgs_custom import g1_vanilla_ppo_runner_cfg,\
+                            g1_qp_without_acc_ppo_runner_cfg
+from .env_cfgs_custom import (
+  g1_vanilla_walk_flat_env_cfg,
+  g1_qp_without_acc_walk_flat_env_cfg,
+)
 
 # Original tasks
 
@@ -35,5 +39,13 @@ register_mjlab_task(
   env_cfg=g1_vanilla_walk_flat_env_cfg(),
   play_env_cfg=g1_vanilla_walk_flat_env_cfg(play=True),
   rl_cfg=g1_vanilla_ppo_runner_cfg(),
+  runner_cls=VelocityOnPolicyRunner,
+)
+
+register_mjlab_task(
+  task_id="G1-QP-NO_ACC_Walk-Flat",
+  env_cfg=g1_qp_without_acc_walk_flat_env_cfg(),
+  play_env_cfg=g1_qp_without_acc_walk_flat_env_cfg(play=True),
+  rl_cfg=g1_qp_without_acc_ppo_runner_cfg(),
   runner_cls=VelocityOnPolicyRunner,
 )
