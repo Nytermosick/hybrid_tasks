@@ -1,3 +1,5 @@
+# TODO: Переделать всё под HTTPS
+
 [submodule "external/rsl_rl"]
 	path = external/rsl_rl
 	url = https://github.com/leggedrobotics/rsl_rl.git
@@ -16,3 +18,6 @@
 [submodule "external/unitree_sdk2_python"]
 	path = external/unitree_sdk2_python
 	url = git@github.com:unitreerobotics/unitree_sdk2_python.git
+[submodule "external/qpth"]
+	path = external/qpth
+	url = https://github.com/armanschwarz/qpth.git
