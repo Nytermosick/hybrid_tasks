@@ -90,7 +90,7 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
     "last_action": ObservationTermCfg(func=mdp.last_action),
     "gait_phase": ObservationTermCfg(
       func=mdp.phase,
-      params={"period": 0.8, "command_name": "twist"},
+      params={"period": 0.8, "command_name": "twist", "command_threshold": 0.1},
     ),
   }
 
@@ -154,6 +154,7 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
       actuator_names=(".*",),
       scale=0.25,  # Override per-robot.
       use_default_offset=True,
+      use_qp_torques=False,
     )
   }
 

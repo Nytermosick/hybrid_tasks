@@ -12,6 +12,12 @@ from mjlab.entity import EntityArticulationInfoCfg, EntityCfg
 from mjlab.utils.spec_config import CollisionCfg
 
 G1_NUM_MOTOR = 29
+G1_MASS = 35.112142
+G1_BASE_INERTIA = np.array([
+    [4.076, -0., 0.04],
+    [-0., 3.816, -0.001],
+    [0.04, -0.001, 0.488],
+])
 
 CONTROL_DT = 0.01
 
@@ -19,6 +25,7 @@ GAIT_PERIOD = 0.8
 GAIT_OFFSET = [0, 0.5]
 GAIT_THRESHOLD = 0.56  # phase < GAIT_THRESHOLD is stance (Stance part)
 STANCE_PERIOD = GAIT_THRESHOLD * GAIT_PERIOD
+COMMAND_STANDING_THRESHOLD = 0.1  # command norm below which the robot is considered standing
 
 F_MAX_Z = 600
 MU = 1.0
@@ -29,7 +36,7 @@ BASE_ORIENT_KP = np.array([1, 1, 1]) * 250
 BASE_ORIENT_KD = np.array([1, 1, 1]) * 7
 
 FOOT_CLEARANCE = 0.10
-COM_HEIGHT_DESIRED = 0.65
+BODY_HEIGHT_DESIRED = 0.75
 
 ##
 # MJCF and assets.
@@ -146,7 +153,7 @@ DEFAULT_JOINT_POS = {
 }
 
 DEFAULT_KEYFRAME = EntityCfg.InitialStateCfg(
-  pos=(0, 0, 0.76),
+  pos=(0, 0, BODY_HEIGHT_DESIRED),
   joint_pos=DEFAULT_JOINT_POS,
   joint_vel={".*": 0.0},
 )
