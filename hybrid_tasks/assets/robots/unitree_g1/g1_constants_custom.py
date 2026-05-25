@@ -30,10 +30,10 @@ COMMAND_STANDING_THRESHOLD = 0.1  # command norm below which the robot is consid
 F_MAX_Z = 600
 MU = 1.0
 
-BASE_POS_KP    = np.array([0, 0, 1]) * 40
-BASE_POS_KD    = np.array([1, 1, 1]) * 7
-BASE_ORIENT_KP = np.array([1, 1, 1]) * 250
-BASE_ORIENT_KD = np.array([1, 1, 1]) * 7
+BASE_POS_KP    = np.array([1, 1, 1]) * 40
+BASE_POS_KD    = np.array([1, 1, 1]) * 3
+BASE_ORIENT_KP = np.array([1, 1, 1]) * 100
+BASE_ORIENT_KD = np.array([1, 1, 1]) * 3
 
 FOOT_CLEARANCE = 0.10
 BODY_HEIGHT_DESIRED = 0.75
@@ -79,43 +79,6 @@ G1_ARTICULATION = EntityArticulationInfoCfg(
 ##
 # Keyframe config.
 ##
-
-# OLD_DEFAULT_JOINT_POS = {
-#   "left_hip_pitch_joint"      : -0.312,
-#   "left_hip_roll_joint"       :  0.0,
-#   "left_hip_yaw_joint"        :  0.0,
-#   "left_knee_joint"           :  0.669,
-#   "left_ankle_pitch_joint"    : -0.363,
-#   "left_ankle_roll_joint"     :  0.0,
-
-#   "right_hip_pitch_joint"     : -0.312,
-#   "right_hip_roll_joint"      :  0.0,
-#   "right_hip_yaw_joint"       :  0.0,
-#   "right_knee_joint"          :  0.669,
-#   "right_ankle_pitch_joint"   : -0.363,
-#   "right_ankle_roll_joint"    :  0.0,
-
-#   "waist_yaw_joint"           :  0.0,
-#   "waist_roll_joint"          :  0.0,
-#   "waist_pitch_joint"         :  0.0,
-
-#   "left_shoulder_pitch_joint" :  0.2,
-#   "left_shoulder_roll_joint"  :  0.2,
-#   "left_shoulder_yaw_joint"   :  0.2,
-#   "left_elbow_joint"          :  0.6,
-#   "left_wrist_roll_joint"     :  0.0,
-#   "left_wrist_pitch_joint"    :  0.0,
-#   "left_wrist_yaw_joint"      :  0.0,
-
-#   "right_shoulder_pitch_joint":  0.2,
-#   "right_shoulder_roll_joint" : -0.2,
-#   "right_shoulder_yaw_joint"  :  0.2,
-#   "right_elbow_joint"         :  0.6,
-#   "right_wrist_roll_joint"    :  0.0,
-#   "right_wrist_pitch_joint"   :  0.0,
-#   "right_wrist_yaw_joint"     :  0.0,
-# }
-
 DEFAULT_JOINT_POS = {
   "left_hip_pitch_joint"      : -0.1,
   "left_hip_roll_joint"       :  0.0,
@@ -153,7 +116,7 @@ DEFAULT_JOINT_POS = {
 }
 
 DEFAULT_KEYFRAME = EntityCfg.InitialStateCfg(
-  pos=(0, 0, BODY_HEIGHT_DESIRED),
+  pos=(0, 0, 0.78),
   joint_pos=DEFAULT_JOINT_POS,
   joint_vel={".*": 0.0},
 )
@@ -196,6 +159,20 @@ for actuator_name, actuator_type in MATCHING_DICT.items():
 
 KPj = np.array([value.stiffness for value in MATCHING_DICT.values()])
 KDj = np.array([value.damping for value in MATCHING_DICT.values()])
+
+# KPj = np.array([40.179, 99.098, 40.179, 99.098, 28.501, 28.501,
+#                 40.179, 99.098, 40.179, 99.098, 28.501, 28.501,
+#                 40.179, 28.501, 28.501,
+#                 14.251, 14.251, 14.251, 14.251, 14.251, 16.778, 16.778,
+#                 14.251, 14.251, 14.251, 14.251, 14.251, 16.778, 16.778])
+
+# KDj = np.array([2.558, 6.309, 2.558, 6.309, 1.814, 1.814,
+#                 2.558, 6.309, 2.558, 6.309, 1.814, 1.814,
+#                 2.558, 1.814, 1.814,
+#                 0.907, 0.907, 0.907, 0.907, 0.907, 1.068, 1.068,
+#                 0.907, 0.907, 0.907, 0.907, 0.907, 1.068, 1.068])
+
+
 
 DEFAULT_JOINT_POS_NP = np.array(list(DEFAULT_JOINT_POS.values()), dtype=float)
 ACTION_SCALE_NP = np.array(list(G1_ACTION_SCALE_CUSTOM.values()), dtype=float)

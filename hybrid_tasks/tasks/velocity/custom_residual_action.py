@@ -84,6 +84,7 @@ class ResidualPositionsAndTorques(JointPositionAction):
     self._left_leg_target_mask = torch.tensor(left_leg_joint_mask, device=self.device)
     self._right_leg_target_mask = torch.tensor(right_leg_joint_mask, device=self.device)
     self._leg_target_mask = self._left_leg_target_mask | self._right_leg_target_mask
+    self._upper_body_target_mask = ~self._leg_target_mask
 
     self._qpcfg = qp.QPCfg(num_envs=self.num_envs, device=self.device)
 
@@ -93,6 +94,9 @@ class ResidualPositionsAndTorques(JointPositionAction):
 
   def process_actions(self, actions: torch.Tensor) -> None:
     super().process_actions(actions)
+    # default_joint_pos = self._entity.data.default_joint_pos[:, self._target_ids]
+    # self._processed_actions[:, self._upper_body_target_mask] = default_joint_pos[
+    #   :, self._upper_body_target_mask]
     if self.cfg.use_qp_torques:
       self._effort_targets[:] = self._compute_qp_torques()
     else:
@@ -100,6 +104,24 @@ class ResidualPositionsAndTorques(JointPositionAction):
 
   def apply_actions(self) -> None:
     super().apply_actions()
+    # position_targets = self._entity.data.joint_pos[:, self._target_ids].clone()
+    # position_targets[:, self._upper_body_target_mask] = self._processed_actions[
+    #   :, self._upper_body_target_mask
+    # ]
+    # encoder_bias = self._entity.data.encoder_bias[:, self._target_ids]
+    # position_targets[:, self._upper_body_target_mask] -= encoder_bias[
+    #   :, self._upper_body_target_mask
+    # ]
+
+    # velocity_targets = self._entity.data.joint_vel[:, self._target_ids].clone()
+    # velocity_targets[:, self._upper_body_target_mask] = 0.0
+
+    # self._entity.set_joint_position_target(
+    #   position_targets, joint_ids=self._target_ids
+    # )
+    # self._entity.set_joint_velocity_target(
+    #   velocity_targets, joint_ids=self._target_ids
+    # )
     self._entity.set_joint_velocity_target(
       self._zero_velocity_targets, joint_ids=self._target_ids
     )
@@ -133,9 +155,12 @@ class ResidualPositionsAndTorques(JointPositionAction):
       moment = foot_wrenches[foot_id][:, 3:6, :]
       torque_targets += -torch.bmm(jacp.transpose(1, 2), force).squeeze(-1)
       torque_targets += -torch.bmm(jacr.transpose(1, 2), moment).squeeze(-1)
-      
-    torque_targets[:, ~self._leg_target_mask] = 0.0
-    torques = torque_targets + self._masked_bias_torques()
+    
+    qfrc_bias = self._asset.data.data.qfrc_bias
+    target_dof_ids = self._target_dof_ids.to(qfrc_bias.device)
+
+    torques = torque_targets + qfrc_bias[:, target_dof_ids].to(self.device)
+    # torque_targets[:, ~self._leg_target_mask] = 0.0
     return torques # TODO: Кориолисовы силы могут быть чувствительными к скоростям суставов
 
   def _bias_torques(self) -> torch.Tensor:

@@ -86,7 +86,7 @@ STIFFNESS_4010 = ARMATURE_4010 * NATURAL_FREQ**2
 DAMPING_5020 = 2.0 * DAMPING_RATIO * ARMATURE_5020 * NATURAL_FREQ
 DAMPING_7520_14 = 2.0 * DAMPING_RATIO * ARMATURE_7520_14 * NATURAL_FREQ
 DAMPING_7520_22 = 2.0 * DAMPING_RATIO * ARMATURE_7520_22 * NATURAL_FREQ
-DAMPING_4010 = 2.0 * DAMPING_RATIO * ARMATURE_4010 * NATURAL_FREQ        
+DAMPING_4010 = 2.0 * DAMPING_RATIO * ARMATURE_4010 * NATURAL_FREQ
 
 ACTUATOR_5020 = CustomActuator(
     tau_acc = 24.8,
@@ -96,7 +96,7 @@ ACTUATOR_5020 = CustomActuator(
     effort_limit = 25.0,
     stiffness = STIFFNESS_5020,
     damping = DAMPING_5020
-) 
+)
 
 ACTUATOR_7520_14 = CustomActuator(
     tau_acc = 71.0,
@@ -128,24 +128,43 @@ ACTUATOR_4010 = CustomActuator(
     damping = DAMPING_4010
 )
 
+ACTUATOR_WAIST = CustomActuator(
+  tau_acc = ACTUATOR_5020.tau_acc * 2,
+  tau_br = ACTUATOR_5020.tau_br * 2,
+  v1 = ACTUATOR_5020.v1 * 2,
+  v2 = ACTUATOR_5020.v2 * 2,
+  effort_limit = ACTUATOR_5020.effort_limit * 2,
+  stiffness = STIFFNESS_5020 * 2,
+  damping = DAMPING_5020 * 2
+)
+ACTUATOR_ANKLE = CustomActuator(
+  tau_acc = ACTUATOR_5020.tau_acc * 2,
+  tau_br = ACTUATOR_5020.tau_br * 2,
+  v1 = ACTUATOR_5020.v1 * 2,
+  v2 = ACTUATOR_5020.v2 * 2,
+  effort_limit = ACTUATOR_5020.effort_limit * 2,
+  stiffness = STIFFNESS_5020 * 2,
+  damping = DAMPING_5020 * 2
+)
+
 MATCHING_DICT = {
     "left_hip_pitch_joint"       : ACTUATOR_7520_22,
     "left_hip_roll_joint"        : ACTUATOR_7520_22,
     "left_hip_yaw_joint"         : ACTUATOR_7520_14,
     "left_knee_joint"            : ACTUATOR_7520_22,
-    "left_ankle_pitch_joint"     : ACTUATOR_5020,
-    "left_ankle_roll_joint"      : ACTUATOR_5020,
+    "left_ankle_pitch_joint"     : ACTUATOR_ANKLE,
+    "left_ankle_roll_joint"      : ACTUATOR_ANKLE,
 
     "right_hip_pitch_joint"      : ACTUATOR_7520_22,
     "right_hip_roll_joint"       : ACTUATOR_7520_22,
     "right_hip_yaw_joint"        : ACTUATOR_7520_14,
     "right_knee_joint"           : ACTUATOR_7520_22,
-    "right_ankle_pitch_joint"    : ACTUATOR_5020,
-    "right_ankle_roll_joint"     : ACTUATOR_5020,
+    "right_ankle_pitch_joint"    : ACTUATOR_ANKLE,
+    "right_ankle_roll_joint"     : ACTUATOR_ANKLE,
 
     "waist_yaw_joint"            : ACTUATOR_7520_14,
-    "waist_roll_joint"           : ACTUATOR_5020,
-    "waist_pitch_joint"          : ACTUATOR_5020,
+    "waist_roll_joint"           : ACTUATOR_WAIST,
+    "waist_pitch_joint"          : ACTUATOR_WAIST,
 
     "left_shoulder_pitch_joint"  : ACTUATOR_5020,
     "left_shoulder_roll_joint"   : ACTUATOR_5020,

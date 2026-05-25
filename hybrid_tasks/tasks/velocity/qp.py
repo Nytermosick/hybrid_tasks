@@ -36,10 +36,10 @@ class QPCfg():
         I3 = np.eye(3)
         O3 = np.zeros([3, 3])
         
-        # mp = 1.0
-        # mm = 1.0
-        mp = 1.25
-        mm = 1.11
+        mp = 1.0
+        mm = 1.0
+        # mp = 2.0
+        # mm = 1.4
 
         # Foot contact verticies
         fcv0 = np.array([+0.12 * mp, +0.030, -0.03])
@@ -121,6 +121,16 @@ def solveQP(
     
     v_des = torch.zeros_like(robot.data.body_link_lin_vel_w[:, 0])
     w_des = torch.zeros_like(robot.data.body_link_ang_vel_w[:, 0])
+
+    ######### QP CHECK
+    # height_phase = 2.0 * torch.pi * env.episode_length_buf * env.step_dt / 2.0
+    # p_des[:, 2] += 0.05 * torch.sin(height_phase)
+    # v_des[:, 2] = (
+    #     0.05
+    #     * (2.0 * torch.pi / 2.0)
+    #     * torch.cos(height_phase)
+    # )
+    ##########
     
     v_des[:, 0:2] = command[:, 0:2]
     v_des = math_utils.quat_apply(qRwbz, v_des) # TODO: Или на qRwb?
@@ -158,13 +168,16 @@ def solveQP(
     mass = qpcfg.mass
     
     p_act = robot.data.body_link_pos_w[:, 0]
+    # print("p_act: ", p_act)
     v_act = robot.data.body_link_lin_vel_w[:, 0] # TODO: we cant use in real robot without estimator
     w_act = robot.data.body_link_ang_vel_w[:, 0]
     
     ori_err = math_utils.quat_box_minus(quat_des, qRwb)    # quat error = quat_des - quat_act
     # print("ori error:", ori_err)
     
-    Ib = qpcfg.Ib
+    M = robot.data.data.qM
+    Ib = M[:, 3:6, 3:6]
+    # Ib = qpcfg.Ib
     Iw = torch.bmm(Rwb.float(), torch.bmm(Ib.float(), RwbT.float()))
     
     foot_names = ("left_foot", "right_foot")
@@ -186,20 +199,25 @@ def solveQP(
     
     Au_top = qpcfg.Au_top
     Au_bot = torch.cat([
-        torch.linalg.solve(Iw, math_utils.skew_symmetric_matrix(rw_left)), I3,\
-        torch.linalg.solve(Iw, math_utils.skew_symmetric_matrix(rw_right)), I3],\
+        torch.linalg.solve(Iw, math_utils.skew_symmetric_matrix(rw_left)),
+        torch.linalg.solve(Iw, I3),
+        torch.linalg.solve(Iw, math_utils.skew_symmetric_matrix(rw_right)),
+        torch.linalg.solve(Iw, I3)],
      dim=2)
     Au = torch.cat([Au_top, Au_bot], dim=1)
     # print("Au:\n", Au)
 
     # TODO: Really need?
-    dl = torch.zeros_like(left_foot_pos)
-    dl[:, 0] = 0.025
-    p_des[:, :2] = ((left_foot_pos + right_foot_pos + 2 * dl) / 2.0)[:, :2]
+    # dl = torch.zeros_like(left_foot_pos)
+    # dl[:, 0] = 0.025
+    # dl = math_utils.quat_apply_yaw(qRwb, dl)
+    # p_des[:, :2] = ((left_foot_pos + right_foot_pos + 2 * dl) / 2.0)[:, :2]
+    # print("p_des updated:", p_des)
     
     a_des_lin = Kpl * (p_des - p_act) + Kdl * (v_des - v_act)
     a_des_ang = Kpa * ori_err + Kda * (w_des - w_act)
     a_des = torch.cat([a_des_lin, a_des_ang], dim=1)
+    # print("a_des:", a_des)
     # a_des[:, :3] += math_utils.quat_apply(qRwbz, a_policy[:, :3])  # a_policy should be in projected frame!
     # a_des[:, 3:] += math_utils.quat_apply(qRwbz, a_policy[:, 3:])  # a_policy should be in projected frame!
 
@@ -216,9 +234,14 @@ def solveQP(
     
     # print("a_des:\n", a_des)
     # print("a_policy:\n", a_policy)
+
+    qfrc_bias = robot.data.data.qfrc_bias
+    acc_dop = torch.linalg.solve(M[:, :6, :6].float(), qfrc_bias[:, :6].float())
+    acc_dop[:, 3:] = math_utils.quat_apply(qRwb, acc_dop[:, 3:])
     
-    gravity = qpcfg.gravity
-    a = (a_des + gravity).unsqueeze(2)
+    # gravity = qpcfg.gravity
+    # a = (a_des + gravity).unsqueeze(2)
+    a = (a_des + acc_dop).unsqueeze(2)
     
     # print("a:", a)
     # print("a shape:", a.shape)
@@ -227,7 +250,7 @@ def solveQP(
     
     g = torch.bmm(torch.transpose(-a.float(), 1, 2), Au.float())
     g = torch.transpose(g, 1, 2)
-    H = torch.bmm(torch.transpose(Au, 1, 2), Au) + 1e-7 * torch.eye(12, device=env.device).unsqueeze(0).expand(env.num_envs, -1, -1)
+    H = torch.bmm(torch.transpose(Au, 1, 2), Au) + 1e-6 * torch.eye(12, device=env.device).unsqueeze(0).expand(env.num_envs, -1, -1)
     
     A = torch.zeros([env.num_envs, 18 * 2, 12], device=env.device)
     ub = torch.zeros([env.num_envs, 18 * 2], device=env.device)
@@ -294,6 +317,10 @@ def solveQP(
     tsolver = time.perf_counter()
     f = qpcfg.qf(H.double(), g.double().squeeze(2), A.double(), ub.double(), e, e).unsqueeze(2).float()
     tsolver = time.perf_counter() - tsolver
+    # print("f_opt: ", f)
+
+    # a_opt = torch.bmm(Au.float(), f.float()) - gravity.unsqueeze(2).float()
+    # print("a_opt: ", a_opt)
     
     # print("f_opt:\n", f.squeeze(2).cpu().numpy())
     

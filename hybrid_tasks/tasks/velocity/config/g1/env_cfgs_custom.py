@@ -123,4 +123,23 @@ def g1_qp_without_acc_walk_flat_env_cfg(
   assert isinstance(joint_pos_action, ResidualPositionsAndTorquesCfg)
   joint_pos_action.use_qp_torques = True
 
+  if play:
+    cfg.commands["twist"].ranges.lin_vel_x = (-1.1, 1.1)
+    cfg.commands["twist"].ranges.lin_vel_y = (-0.3, 0.3)
+    cfg.commands["twist"].ranges.ang_vel_z = (-1.5, 1.5)
+    # cfg.commands["twist"].ranges.lin_vel_x = (0.0, 0.0)
+    # cfg.commands["twist"].ranges.lin_vel_y = (0.0, 0.0)
+    # cfg.commands["twist"].ranges.ang_vel_z = (0.0, 0.0)
+
+    # cfg.events["reset_base"].params["pose_range"]["x"] = (-0.0, 0.0)
+    # cfg.events["reset_base"].params["pose_range"]["y"] = (-0.0, 0.0)
+    # cfg.events["reset_base"].params["pose_range"]["z"] = (-0.0, 0.0)
+    # cfg.events["reset_base"].params["pose_range"]["roll"] = (-0.0, 0.0)
+    # cfg.events["reset_base"].params["pose_range"]["pitch"] = (-0.0, 0.0)
+    # cfg.events["reset_base"].params["pose_range"]["yaw"] = (-0.0, 0.0)
+
+    # cfg.events["reset_robot_joints"].params["position_range"] = (-0.0, 0.0)
+    # cfg.events["reset_robot_joints"].params["velocity_range"] = (-0.0, 0.0)
+
+
   return cfg
