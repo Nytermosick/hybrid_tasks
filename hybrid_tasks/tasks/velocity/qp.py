@@ -39,7 +39,7 @@ class QPCfg():
         mp = 1.0
         mm = 1.0
         # mp = 2.0
-        # mm = 1.4
+        # mm = 1.5
 
         # Foot contact verticies
         fcv0 = np.array([+0.12 * mp, +0.030, -0.03])
@@ -250,7 +250,7 @@ def solveQP(
     
     g = torch.bmm(torch.transpose(-a.float(), 1, 2), Au.float())
     g = torch.transpose(g, 1, 2)
-    H = torch.bmm(torch.transpose(Au, 1, 2), Au) + 1e-6 * torch.eye(12, device=env.device).unsqueeze(0).expand(env.num_envs, -1, -1)
+    H = torch.bmm(torch.transpose(Au, 1, 2), Au) + 1e-4 * torch.eye(12, device=env.device).unsqueeze(0).expand(env.num_envs, -1, -1)
     
     A = torch.zeros([env.num_envs, 18 * 2, 12], device=env.device)
     ub = torch.zeros([env.num_envs, 18 * 2], device=env.device)

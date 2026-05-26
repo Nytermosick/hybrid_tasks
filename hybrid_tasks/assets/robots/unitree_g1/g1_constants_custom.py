@@ -30,12 +30,12 @@ COMMAND_STANDING_THRESHOLD = 0.1  # command norm below which the robot is consid
 F_MAX_Z = 600
 MU = 1.0
 
-BASE_POS_KP    = np.array([1, 1, 1]) * 40
-BASE_POS_KD    = np.array([1, 1, 1]) * 3
-BASE_ORIENT_KP = np.array([1, 1, 1]) * 100
-BASE_ORIENT_KD = np.array([1, 1, 1]) * 3
+BASE_POS_KP    = np.array([1, 1, 1]) * 0
+BASE_POS_KD    = np.array([1, 1, 1]) * 0
+BASE_ORIENT_KP = np.array([1, 1, 1]) * 50
+BASE_ORIENT_KD = np.array([1, 1, 1]) * 2
 
-FOOT_CLEARANCE = 0.10
+FOOT_CLEARANCE = 0.15
 BODY_HEIGHT_DESIRED = 0.75
 
 ##
