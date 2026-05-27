@@ -13,11 +13,11 @@ from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowState_
 from unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
 
-from utils import quat_rotate_inverse
+from utils import compute_gait_phase, compute_gait_stance, quat_rotate_inverse
 from hybrid_tasks.assets.robots import DEFAULT_JOINT_POS_NP as DEFAULT_JOINT_POS
 from hybrid_tasks.assets.robots import KPj, KDj,\
                                        GAIT_PERIOD, GAIT_OFFSET, GAIT_THRESHOLD,\
-                                       G1_NUM_MOTOR
+                                       COMMAND_STANDING_THRESHOLD, G1_NUM_MOTOR
 
 class Mode:
     PR = 0  # Series Control for Pitch/Roll Joints
@@ -39,7 +39,7 @@ class ObsData:
         self.last_action = np.zeros(action_dim)
 
         self.base_quat = np.zeros(4)  # Base quaternion (w, x, y, z)
-        self.com_pos_wf = np.zeros(3)
+        self.base_pos_wf = np.zeros(3)
 
         self.projected_gravity = np.zeros(3) # Projected gravity in Body Frame
         
@@ -48,8 +48,7 @@ class ObsData:
 
         self.gait_phase = np.zeros(2)
 
-        self.shoulders_body_wf = np.zeros(2) # Shoulders of legs relative to body in World Frame
-        self.shoulders_com_wf = np.zeros(2) # Shoulders of legs relative to COM in World Frame
+        self.shoulders_base_wf = np.zeros(2) # Shoulders of legs relative to body in World Frame
 
         self.Rwl = np.zeros((3,3))
         self.Rwr = np.zeros((3,3))
@@ -58,6 +57,8 @@ class ObsData:
         self.J_right = np.zeros((6, 6)) # Jacobian of right leg in World Frame (6x6)
 
         self.gravity_torques = np.zeros(joints_dim)
+        self.bias_torques = np.zeros(joints_dim + 6)
+        self.mass_matrix = np.zeros([joints_dim + 6, joints_dim + 6])
 
         self.is_stance = np.zeros(2)
 
@@ -121,10 +122,12 @@ class G1_Env:
         self.default_dq      = np.zeros(G1_NUM_MOTOR)
 
         self.pin_model = pin.buildModelFromMJCF(xml_path)
-        self.pin_data = self.pin_model.createData()
 
-        foot_names = ["left_ankle_roll_link", "right_ankle_roll_link"]
-        self.foot_frame_ids = [self.pin_model.getFrameId(name) for name in foot_names]
+        # foot_names = ["left_ankle_roll_link", "right_ankle_roll_link"]
+        # self.foot_frame_ids = [self.pin_model.getFrameId(name) for name in foot_names]
+        self.foot_frame_ids = self._ensure_foot_site_frames()
+
+        self.pin_data = self.pin_model.createData()
 
         self.q_pin_def = np.zeros(G1_NUM_MOTOR+7)
         # self.q_pin_def[2] = -0.793
@@ -137,6 +140,46 @@ class G1_Env:
         self.time = 0.0
 
         self._init_dds(interface)
+
+    def _ensure_foot_site_frames(self):
+        foot_sites = {
+            "left_foot": ("left_ankle_roll_link", np.array([0.04, 0.0, -0.037])),
+            "right_foot": ("right_ankle_roll_link", np.array([0.04, 0.0, -0.037])),
+        }
+
+        foot_frame_ids = []
+        for site_name, (body_name, site_offset) in foot_sites.items():
+            frame_id = self.pin_model.getFrameId(site_name)
+            if frame_id < self.pin_model.nframes:
+                foot_frame_ids.append(frame_id)
+                continue
+
+            body_frame_id = self.pin_model.getFrameId(body_name)
+            if body_frame_id >= self.pin_model.nframes:
+                raise ValueError(f"Pinocchio model does not contain body frame '{body_name}'")
+
+            body_frame = self.pin_model.frames[body_frame_id]
+            site_placement = pin.SE3(np.eye(3), site_offset)
+            foot_placement = body_frame.placement * site_placement
+
+            try:
+                foot_frame = pin.Frame(
+                    site_name,
+                    body_frame.parentJoint,
+                    body_frame_id,
+                    foot_placement,
+                    pin.FrameType.OP_FRAME,
+                )
+            except TypeError:
+                foot_frame = pin.Frame(
+                    site_name,
+                    body_frame.parentJoint,
+                    foot_placement,
+                    pin.FrameType.OP_FRAME,
+                )
+
+            foot_frame_ids.append(self.pin_model.addFrame(foot_frame))
+        return foot_frame_ids
 
     def _init_dds(self, interface):
         # Initialization of DDS message factory
@@ -285,20 +328,13 @@ class G1_Env:
         pin.forwardKinematics(self.pin_model, self.pin_data, q_pin)
         pin.updateFramePlacements(self.pin_model, self.pin_data)
 
-        # Finding positions of COM and legs relative to pelvis_link in World Frame
-        com_rel_body_wf = pin.centerOfMass(self.pin_model, self.pin_data, q_pin)
-        shoulders_body_wf = np.array([self.pin_data.oMf[id].translation for id in self.foot_frame_ids])
+        # Foot site poses in world frame, matching training QP site_names.
+        shoulders_base_wf = np.array([self.pin_data.oMf[id].translation for id in self.foot_frame_ids])
         
         Rwl = self.pin_data.oMf[self.foot_frame_ids[0]].rotation
         Rwr = self.pin_data.oMf[self.foot_frame_ids[1]].rotation
 
-        # Shoulders between legs and COM in World Frame
-        shoulders_com_wf = shoulders_body_wf.copy()
-        # shoulders_com_wf[:, 2] -= com_rel_body_wf[2]
-        shoulders_com_wf[:] -= com_rel_body_wf
-        
-
-        # Jacobians of legs in World Frame
+        # Foot site Jacobians in World Frame
         J_left = pin.computeFrameJacobian(self.pin_model, self.pin_data, q_pin, self.foot_frame_ids[0], pin.ReferenceFrame.LOCAL_WORLD_ALIGNED)
         J_right = pin.computeFrameJacobian(self.pin_model, self.pin_data, q_pin, self.foot_frame_ids[1], pin.ReferenceFrame.LOCAL_WORLD_ALIGNED)
 
@@ -307,31 +343,39 @@ class G1_Env:
         J_right = J_right[:, 12:18]
 
         dq_pin = np.zeros(G1_NUM_MOTOR+6)
+        dq_pin[3:6] = base_ang_vel_b
         dq_pin[6:] += dq_cur
-        gravity_torques = pin.rnea(self.pin_model, self.pin_data, q_pin, dq_pin, np.zeros(G1_NUM_MOTOR+6))[6:]
+        bias_torques = pin.rnea(self.pin_model, self.pin_data, q_pin, dq_pin, np.zeros(G1_NUM_MOTOR+6))
+        
+        mass_matrix = pin.crba(self.pin_model, self.pin_data, q_pin)
+        mass_matrix = 0.5 * (mass_matrix + mass_matrix.T)
 
-        gait_phase = np.zeros(2)
         self.time += self.control_dt
-        phase = self.time % GAIT_PERIOD / GAIT_PERIOD
 
-        legs_phases = [(phase + GAIT_OFFSET[i]) % 1.0 for i in range(2)]
-        is_stance = [leg_phase < GAIT_THRESHOLD for leg_phase in legs_phases]
+        is_stance = compute_gait_stance(
+            self.time,
+            GAIT_PERIOD,
+            GAIT_OFFSET,
+            GAIT_THRESHOLD,
+            self.velocity_commands,
+            COMMAND_STANDING_THRESHOLD,
+        )
+
+        gait_phase = compute_gait_phase(
+            self.time,
+            GAIT_PERIOD,
+            self.velocity_commands,
+            COMMAND_STANDING_THRESHOLD,
+        )
 
         cnt = 0.0
         base_height_wf = 0.0
         for i in range(2):
             if is_stance[i]:
-                base_height_wf += -shoulders_body_wf[i][2]
+                base_height_wf += -shoulders_base_wf[i][2]
                 cnt += 1.0
         base_height_wf /= cnt
-        com_pos_wf = np.array([0.0, 0.0, base_height_wf])
-        # com_pos_wf[2] += com_rel_body_wf[2]
-        com_pos_wf += com_rel_body_wf
-
-        # print("Calculated: ", com_pos_wf)
-
-        gait_phase[0] = np.sin(phase*2*3.1415)
-        gait_phase[1] = np.cos(phase*2*3.1415)
+        base_pos_wf = np.array([0.0, 0.0, base_height_wf])
 
         # Filling structure
         self.obs_data.velocity_commands = self.velocity_commands
@@ -340,17 +384,17 @@ class G1_Env:
         self.obs_data.joint_pos_rel = q_cur - self.default_q
         self.obs_data.joint_vel_rel = dq_cur - self.default_dq
         self.obs_data.base_quat = base_quat
-        self.obs_data.com_pos_wf = com_pos_wf
+        self.obs_data.base_pos_wf = base_pos_wf
         self.obs_data.projected_gravity = projected_gravity
         self.obs_data.base_ang_vel_b = base_ang_vel_b
         self.obs_data.base_lin_accel_b = base_lin_accel_b
-        self.obs_data.shoulders_body_wf = shoulders_body_wf
-        self.obs_data.shoulders_com_wf = shoulders_com_wf
+        self.obs_data.shoulders_base_wf = shoulders_base_wf
         self.obs_data.Rwl = Rwl
         self.obs_data.Rwr = Rwr
         self.obs_data.J_left = J_left
         self.obs_data.J_right = J_right
-        self.obs_data.gravity_torques = gravity_torques
+        self.obs_data.bias_torques = bias_torques
+        self.obs_data.mass_matrix = mass_matrix
         self.obs_data.gait_phase = gait_phase
         self.obs_data.is_stance = is_stance
         self.obs_data.time = self.time

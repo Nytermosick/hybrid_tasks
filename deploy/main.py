@@ -9,7 +9,7 @@ from utils import find_gamepad_event
 from robot_env import G1_Env
 from hybrid_tasks.assets.robots import CONTROL_DT, G1_NUM_MOTOR
 from simple_controller import SimpleController
-# from QP_controller import QPController
+from QP_controller import QPController
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -40,7 +40,9 @@ parser.add_argument(
 parser.add_argument(
     "--policy_path",
     type=str,
-    default="logs/rsl_rl/g1_vanilla_walk/2026-05-19_19-00-21/policy.onnx",
+    # default="logs/rsl_rl/g1_vanilla_walk/vanilla/policy.onnx",
+    default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-26_19-32-40_30k/policy.onnx",
+    # default="logs/rsl_rl/g1_vanilla_walk/2026-05-19_19-00-21/policy.onnx", # with old q_def
     help="Путь до файла политики."
 )
 
@@ -84,12 +86,27 @@ def keyboard_listener(key):
         return
 
 ### НАСТРОЙКА ДЖОЙСТИКА ###
-def normalize(value, min_raw=0, max_raw=255, out_min=-0.5, out_max=0.5):
-    """Нормализация диапазона raw → [-0.5, 0.5]"""
+GAMEPAD_AXIS_COMMANDS = (
+    {"cmd_idx": 0, "axis": 1, "sign": -1.0, "max_abs": 1.1},  # left stick Y -> vx
+    {"cmd_idx": 1, "axis": 0, "sign": -1.0, "max_abs": 0.3},  # left stick X -> vy
+    {"cmd_idx": 2, "axis": 3, "sign": -1.0, "max_abs": 1.5},  # right stick X -> wz
+)
+
+def normalize_axis(value, min_raw, max_raw, *, max_abs, sign=1.0):
     value = max(min(value, max_raw), min_raw)
-    norm = (value - min_raw) / (max_raw - min_raw)
-    mapped = out_min + norm * (out_max - out_min)
-    return mapped
+    normalized = 2.0 * (value - min_raw) / (max_raw - min_raw) - 1.0
+    return sign * normalized * max_abs
+
+def update_velocity_commands_from_gamepad():
+    for axis_cfg in GAMEPAD_AXIS_COMMANDS:
+        abs_info = gamepad.absinfo(axis_cfg["axis"])
+        robot_env.velocity_commands[axis_cfg["cmd_idx"]] = normalize_axis(
+            abs_info.value,
+            abs_info.min,
+            abs_info.max,
+            max_abs=axis_cfg["max_abs"],
+            sign=axis_cfg["sign"],
+        )
 
 if args.joystick_on:
     device_path = find_gamepad_event()
@@ -101,15 +118,15 @@ keyboard_listener_thread = keyboard.Listener(on_press=keyboard_listener)
 keyboard_listener_thread.start()
 
 mode = 0
-velocity_commands = [0.0, 0.0, 1.0]
+velocity_commands = [0.0, 0.0, 0.0]
 
 interface = args.interface
 robot_scene = os.path.join(ROOT_DIR, "external", "unitree_mujoco", "unitree_robots", "g1", "g1_29dof.xml")
 robot_env = G1_Env(interface, robot_scene, control_dt=CONTROL_DT, velocity_commands=velocity_commands,
                    obs_dim=98, history_len=1, action_dim=G1_NUM_MOTOR)
 # controller = QPController(policy_path=args.policy_path, dt=CONTROL_DT, enable_swing_controller=True, air_fix=args.air_fix)
-# controller = QPController(policy_path=args.policy_path, dt=CONTROL_DT, enable_swing_controller=False, air_fix=args.air_fix)
-controller = SimpleController(policy_path=args.policy_path)
+controller = QPController(policy_path=args.policy_path, dt=CONTROL_DT)
+# controller = SimpleController(policy_path=args.policy_path)
 
 band_enabled = True if interface == "lo" else False # Only for Simulator!
 
@@ -142,9 +159,7 @@ try:
                 band_enabled = False
 
             if args.joystick_on:
-                robot_env.velocity_commands[0] = -normalize(gamepad.absinfo(1)[0])
-                robot_env.velocity_commands[1] = -normalize(gamepad.absinfo(0)[0])
-                robot_env.velocity_commands[2] = -normalize(gamepad.absinfo(3)[0])
+                update_velocity_commands_from_gamepad()
             print(f"Desired Velocity: X={robot_env.velocity_commands[0]:+.03f} Y={robot_env.velocity_commands[1]:+.03f} Z={robot_env.velocity_commands[2]:+.03f}")
 
             obs_data = robot_env.get_measurements()

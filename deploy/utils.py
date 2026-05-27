@@ -67,6 +67,47 @@ def quat_rotate_inverse(q: np.ndarray, v: np.ndarray) -> np.ndarray:
 
     return a - b + c            # знак "минус b" → именно inverse-поворот
 
+def compute_gait_phase(
+    time: float | np.ndarray,
+    period: float,
+    command: np.ndarray | None = None,
+    command_threshold: float = 0.1,
+) -> np.ndarray:
+    global_phase = np.asarray(time, dtype=float) % period / period
+    phase = np.stack(
+        (
+            np.sin(global_phase * np.pi * 2.0),
+            np.cos(global_phase * np.pi * 2.0),
+        ),
+        axis=-1,
+    )
+
+    if command is None:
+        return phase
+
+    command_norm = np.linalg.norm(np.asarray(command, dtype=float), axis=-1)
+    stand_mask = command_norm < command_threshold
+    return np.where(np.expand_dims(stand_mask, axis=-1), np.zeros_like(phase), phase)
+
+def compute_gait_stance(
+    time: float | np.ndarray,
+    period: float,
+    offset: list[float] | np.ndarray,
+    threshold: float,
+    command: np.ndarray | None = None,
+    command_threshold: float = 0.1,
+) -> np.ndarray:
+    global_phase = np.asarray(time, dtype=float) % period / period
+    leg_phase = (np.expand_dims(global_phase, axis=-1) + np.asarray(offset, dtype=float)) % 1.0
+    is_stance = leg_phase < threshold
+
+    if command is None:
+        return is_stance
+
+    command = np.asarray(command, dtype=float)
+    stand_mask = np.linalg.norm(command[..., :2], axis=-1) + np.abs(command[..., 2]) <= command_threshold
+    return np.where(np.expand_dims(stand_mask, axis=-1), np.ones_like(is_stance), is_stance)
+
 def skew(v):
     return np.array([[0, -v[2], v[1]],
                      [v[2], 0, -v[0]],

@@ -1,7 +1,6 @@
 import numpy as np
 import onnxruntime as ort
 from robot_env import ObsData
-from hybrid_tasks.assets.robots import G1_ACTION_SCALE_CUSTOM as ACTION_SCALE
 from hybrid_tasks.assets.robots import DEFAULT_JOINT_POS_NP as DEFAULT_JOINT_POS
 from hybrid_tasks.assets.robots import ACTION_SCALE_NP as ACTION_SCALE
 
