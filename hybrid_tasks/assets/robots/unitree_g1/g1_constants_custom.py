@@ -26,6 +26,7 @@ GAIT_OFFSET = [0, 0.5]
 GAIT_THRESHOLD = 0.56  # phase < GAIT_THRESHOLD is stance (Stance part)
 STANCE_PERIOD = GAIT_THRESHOLD * GAIT_PERIOD
 COMMAND_STANDING_THRESHOLD = 0.1  # command norm below which the robot is considered standing
+QP_YAW_ERROR_LIMIT = 0.35  # rad, max yaw error sent to QP after desired heading integration
 
 F_MAX_Z = 600
 MU = 1.0

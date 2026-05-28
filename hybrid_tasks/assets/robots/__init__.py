@@ -18,7 +18,7 @@ from .unitree_g1.g1_constants_custom import DEFAULT_JOINT_POS_NP, KPj, KDj,\
                                             G1_MASS, G1_BASE_INERTIA, \
                                             F_MAX_Z, MU,\
                                             BASE_POS_KP, BASE_POS_KD, BASE_ORIENT_KP, BASE_ORIENT_KD,\
-                                            COMMAND_STANDING_THRESHOLD
+                                            COMMAND_STANDING_THRESHOLD, QP_YAW_ERROR_LIMIT
 from .unitree_g1.g1_constants_custom import (
   get_g1_robot_cfg_custom as get_g1_robot_cfg_custom,
 )

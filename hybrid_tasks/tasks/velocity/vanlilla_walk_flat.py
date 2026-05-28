@@ -79,6 +79,10 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
       func=mdp.generated_commands,
       params={"command_name": "twist"},
     ),
+    "yaw_orientation_error": ObservationTermCfg(
+      func=mdp.yaw_orientation_error,
+      params={"command_name": "twist"},
+    ),
     "joint_pos_rel": ObservationTermCfg(
       func=mdp.joint_pos_rel,
       noise=Unoise(n_min=-0.01, n_max=0.01),

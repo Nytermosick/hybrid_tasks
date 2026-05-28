@@ -14,7 +14,7 @@ from hybrid_tasks.assets.robots import BODY_HEIGHT_DESIRED,\
                                        F_MAX_Z, MU,\
                                        G1_MASS, G1_BASE_INERTIA,\
                                        BASE_POS_KP, BASE_POS_KD, BASE_ORIENT_KP, BASE_ORIENT_KD,\
-                                       COMMAND_STANDING_THRESHOLD
+                                       COMMAND_STANDING_THRESHOLD, QP_YAW_ERROR_LIMIT
 
 np.set_printoptions(precision=3, suppress=True, linewidth=2000)
 torch.set_printoptions(precision=3, linewidth=2000)
@@ -87,6 +87,9 @@ class QPCfg():
 
         self.quat_yaw_init = torch.zeros([num_envs, 4], device=device)
         self.quat_yaw_init[:, 0] = 1.0    # w in quaternion
+        self.yaw_des_raw = torch.zeros(num_envs, device=device)
+        self.yaw_des_last_step = torch.full((num_envs,), -1, device=device, dtype=torch.long)
+        self.yaw_error_limit = QP_YAW_ERROR_LIMIT
         
 
 def solveQP(
@@ -137,19 +140,28 @@ def solveQP(
 
     w_des[:, 2] = command[:, 2]
 
-
-    qpcfg.quat_yaw_init = math_utils.quat_mul(
-        math_utils.quat_from_euler_xyz(
-            w_des[:, 0],
-            w_des[:, 1],
-            w_des[:, 2] * env.step_dt
-        ),
-        torch.where(
-            env.episode_length_buf.unsqueeze(-1) == 0,
-            math_utils.yaw_quat(qRwb),
-            qpcfg.quat_yaw_init
-        )
+    current_yaw = _yaw_from_quat(qRwbz)
+    update_yaw_des = env.episode_length_buf != qpcfg.yaw_des_last_step
+    updated_raw_yaw_des = torch.where(
+        env.episode_length_buf == 0,
+        current_yaw,
+        _wrap_to_pi(qpcfg.yaw_des_raw + w_des[:, 2] * env.step_dt),
     )
+    raw_yaw_des = torch.where(update_yaw_des, updated_raw_yaw_des, qpcfg.yaw_des_raw)
+    qpcfg.yaw_des_raw = raw_yaw_des.detach()
+    qpcfg.yaw_des_last_step = torch.where(
+        update_yaw_des,
+        env.episode_length_buf,
+        qpcfg.yaw_des_last_step,
+    )
+
+    yaw_error = _wrap_to_pi(raw_yaw_des - current_yaw)
+    bounded_yaw_error = torch.clamp(
+        yaw_error,
+        min=-qpcfg.yaw_error_limit,
+        max=qpcfg.yaw_error_limit,
+    )
+    qpcfg.quat_yaw_init = _yaw_quat_from_yaw(_wrap_to_pi(current_yaw + bounded_yaw_error))
     rpy_des = torch.zeros((env.num_envs, 3), device=env.device)
     quat_des = math_utils.quat_from_euler_xyz(rpy_des[:, 0], rpy_des[:, 1], rpy_des[:, 2])    # XYZ order!!!
     quat_des = math_utils.quat_mul(qpcfg.quat_yaw_init, quat_des)
@@ -368,62 +380,20 @@ def gaitStanceWithCommand(
     standing = total_command <= command_threshold
     return torch.where(standing.unsqueeze(1), torch.ones_like(is_stance), is_stance)
 
-
-def gaitSwingPhase(
-    env: ManagerBasedRlEnv,
-    period: float,
-    offset: list[float],
-    threshold: float = 0.5,
-) -> torch.Tensor:
-    if not hasattr(env, "episode_length_buf"):
-        env.episode_length_buf = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
-    
-    global_phase = (env.episode_length_buf * env.step_dt) % period / period
-    
-    phases = []
-    for offset_ in offset:
-        phase = (global_phase+offset_) % 1.0
-        phase = (phase >= threshold) * (phase-threshold) / (1.0-threshold)    # swing
-        phases.append(phase.view(env.num_envs, -1))
-    return torch.cat(phases, dim=1)
-
-
-def gaitStancePhase(
-    env: ManagerBasedRlEnv,
-    period: float,
-    offset: list[float],
-    threshold: float = 0.5,
-) -> torch.Tensor:
-    if not hasattr(env, "episode_length_buf"):
-        env.episode_length_buf = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
-    
-    global_phase = (env.episode_length_buf * env.step_dt) % period / period
-    
-    phases = []
-    for offset_ in offset:
-        phase = (global_phase+offset_) % 1.0
-        phase = (phase < threshold) * phase / threshold    # stance
-        phases.append(phase.view(env.num_envs, -1))
-    return torch.cat(phases, dim=1)
-
-
-def gaitPhase(
-    env: ManagerBasedRlEnv,
-    period: float,
-    offset: list[float],
-) -> torch.Tensor:
-    if not hasattr(env, "episode_length_buf"):
-        env.episode_length_buf = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
-    
-    global_phase = (env.episode_length_buf * env.step_dt) % period / period
-    
-    phases = []
-    for offset_ in offset:
-        phase = (global_phase+offset_) % 1.0
-        phases.append(phase.view(env.num_envs, -1, 1))
-    leg_phase = torch.cat(phases, dim=2)
-    
-    return leg_phase.to(env.device).squeeze(1)    # [num_envs, 4]
-
 def tskew(v) -> torch.Tensor:
     return math_utils.skew_symmetric_matrix(v)
+
+def _wrap_to_pi(angle: torch.Tensor) -> torch.Tensor:
+    return torch.atan2(torch.sin(angle), torch.cos(angle))
+
+
+def _yaw_from_quat(quat: torch.Tensor) -> torch.Tensor:
+    w, x, y, z = quat.unbind(dim=-1)
+    return torch.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+
+
+def _yaw_quat_from_yaw(yaw: torch.Tensor) -> torch.Tensor:
+    quat = torch.zeros((yaw.shape[0], 4), device=yaw.device, dtype=yaw.dtype)
+    quat[:, 0] = torch.cos(0.5 * yaw)
+    quat[:, 3] = torch.sin(0.5 * yaw)
+    return quat
