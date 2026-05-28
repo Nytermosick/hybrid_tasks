@@ -12,6 +12,7 @@ from mjlab.utils.lab_api.math import quat_apply_inverse
 from mjlab.utils.lab_api.string import (
   resolve_matching_names_values,
 )
+from .observations import yaw_orientation_error
 
 if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
@@ -58,6 +59,22 @@ def track_angular_velocity(
   xy_error = torch.sum(torch.square(actual[:, :2]), dim=1)
   ang_vel_error = z_error + (0.05 * xy_error)
   return torch.exp(-ang_vel_error / std**2)
+
+
+def yaw_orientation_error_l2(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  error_limit: float | None = None,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+  """Penalize yaw-only error between integrated desired heading and current heading."""
+  yaw_error = yaw_orientation_error(
+    env,
+    command_name=command_name,
+    error_limit=error_limit,
+    asset_cfg=asset_cfg,
+  ).squeeze(1)
+  return torch.square(yaw_error)
 
 
 def body_orientation_l2(
@@ -425,4 +442,3 @@ def stand_still(
             scale = (total_command <= command_threshold).float()
             reward *= scale
     return reward
-

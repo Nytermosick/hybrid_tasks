@@ -275,6 +275,11 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
       weight=1.0,
       params={"command_name": "twist", "std": math.sqrt(0.25)},
     ),
+    "yaw_orientation_error_l2": RewardTermCfg(
+      func=mdp.yaw_orientation_error_l2,
+      weight=-0.2,
+      params={"command_name": "twist"},
+    ),
     "body_orientation_l2": RewardTermCfg(
       func=mdp.body_orientation_l2,
       weight=-1.0,
