@@ -309,3 +309,36 @@ def so3_error(R, Rd):
         Re[0,2] - Re[2,0],
         Re[1,0] - Re[0,1]
     ])
+
+def euler_from_quat(q):
+    w, x, y, z = q  # wxyz
+
+    # roll (x-axis rotation)
+    sinr_cosp = 2.0 * (w * x + y * z)
+    cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
+    roll = np.arctan2(sinr_cosp, cosr_cosp)
+
+    # pitch (y-axis rotation)
+    sinp = 2.0 * (w * y - z * x)
+    if abs(sinp) >= 1:
+        pitch = np.sign(sinp) * np.pi / 2  # use 90 degrees if out of range
+    else:
+        pitch = np.arcsin(sinp)
+
+    # yaw (z-axis rotation)
+    siny_cosp = 2.0 * (w * z + x * y)
+    cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+    yaw = np.arctan2(siny_cosp, cosy_cosp)
+
+    return np.array([roll, pitch, yaw])
+
+def wrap_to_pi(angle):
+    return np.arctan2(np.sin(angle), np.cos(angle))
+
+
+def yaw_from_quat(quat):
+    return euler_from_quat(quat)[2]
+
+
+def yaw_quat_from_yaw(yaw):
+    return np.array([np.cos(0.5 * yaw), 0.0, 0.0, np.sin(0.5 * yaw)], dtype=float)

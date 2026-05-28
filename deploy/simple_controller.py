@@ -1,13 +1,16 @@
 import numpy as np
 import onnxruntime as ort
 from robot_env import ObsData
+import utils as utils
 from hybrid_tasks.assets.robots import DEFAULT_JOINT_POS_NP as DEFAULT_JOINT_POS
 from hybrid_tasks.assets.robots import ACTION_SCALE_NP as ACTION_SCALE
 
 class SimpleController:
-    def __init__(self, policy_path, dt=None): # dt doesn't use
+    def __init__(self, policy_path, dt):
         self.session = ort.InferenceSession(policy_path, providers=["CPUExecutionProvider"])
 
+        self.control_dt = dt
+        self.yaw_des_raw = 0.0
         self.initialized = False
 
     def step(self, obs_data: ObsData):
@@ -16,8 +19,12 @@ class SimpleController:
         return: actions numpy
         """
         if not self.initialized:
+            self.yaw_des_raw = utils.yaw_from_quat(obs_data.base_quat)
+            obs_data.yaw_orientation_error = np.zeros(1)
             obs_data.init_obs_buffers()
             self.initialized = True
+        else:
+            self._update_desired_yaw(obs_data)
 
         obs = obs_data.get_obs_full_vector()
 
@@ -39,3 +46,11 @@ class SimpleController:
         full_dq = np.zeros_like(DEFAULT_JOINT_POS)
 
         return full_torques, full_q, full_dq
+
+    def _update_desired_yaw(self, obs_data: ObsData):
+        current_yaw = utils.yaw_from_quat(obs_data.base_quat)
+        self.yaw_des_raw = utils.wrap_to_pi(
+            self.yaw_des_raw + obs_data.velocity_commands[2] * self.control_dt
+        )
+        yaw_error = utils.wrap_to_pi(self.yaw_des_raw - current_yaw)
+        obs_data.yaw_orientation_error = np.array([yaw_error], dtype=float)

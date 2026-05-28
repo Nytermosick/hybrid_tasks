@@ -24,11 +24,12 @@ class Mode:
     AB = 1  # Parallel Control for A/B Joints
 
 class ObsData:
-    def __init__(self, joints_dim=G1_NUM_MOTOR, action_dim=G1_NUM_MOTOR, obs_dim=98, history_len = 1):
+    def __init__(self, joints_dim=G1_NUM_MOTOR, action_dim=G1_NUM_MOTOR, obs_dim=99, history_len = 1):
         self.obs_dim = obs_dim
         self.history_len = history_len
 
         self.velocity_commands = np.zeros(3) # Desired velocity commands (x, y, wz)
+        self.yaw_orientation_error = np.zeros(1)
 
         self.joint_pos = np.zeros(joints_dim) # Joint positions for left and right legs
         self.joint_vel = np.zeros(joints_dim) # Joint velocities for left and right legs
@@ -67,6 +68,7 @@ class ObsData:
         self.obs_base_ang_vel = deque(maxlen=history_len)
         self.obs_projected_gravity = deque(maxlen=history_len)
         self.obs_velocity_commands = deque(maxlen=history_len)
+        self.obs_yaw_orientation_error = deque(maxlen=history_len)
         self.obs_joint_pos_rel = deque(maxlen=history_len)
         self.obs_joint_vel_rel = deque(maxlen=history_len)
         self.obs_last_action = deque(maxlen=history_len)
@@ -82,6 +84,7 @@ class ObsData:
         self.obs_base_ang_vel.append(self.base_ang_vel_b)
         self.obs_projected_gravity.append(self.projected_gravity)
         self.obs_velocity_commands.append(self.velocity_commands)
+        self.obs_yaw_orientation_error.append(self.yaw_orientation_error)
         self.obs_joint_pos_rel.append(self.joint_pos_rel)
         self.obs_joint_vel_rel.append(self.joint_vel_rel)
         self.obs_last_action.append(self.last_action)
@@ -93,19 +96,20 @@ class ObsData:
         base_ang = np.concatenate(list(self.obs_base_ang_vel), axis=0)
         proj_g   = np.concatenate(list(self.obs_projected_gravity), axis=0)
         vel_cmd  = np.concatenate(list(self.obs_velocity_commands), axis=0)
+        yaw_err  = np.concatenate(list(self.obs_yaw_orientation_error), axis=0)
         jpos     = np.concatenate(list(self.obs_joint_pos_rel), axis=0)
         jvel     = np.concatenate(list(self.obs_joint_vel_rel), axis=0)
         laction = np.concatenate(list(self.obs_last_action), axis=0)
         gphase = np.concatenate(list(self.obs_gait_phase), axis=0)
 
-        obs_full = np.concatenate([base_ang, proj_g, vel_cmd, jpos, jvel, laction, gphase], axis=0).astype(np.float32)
+        obs_full = np.concatenate([base_ang, proj_g, vel_cmd, yaw_err, jpos, jvel, laction, gphase], axis=0).astype(np.float32)
 
         return obs_full
 
 
 class G1_Env:
     def __init__(self, interface, xml_path, control_dt, velocity_commands=[0, 0, 0],
-                 action_dim=G1_NUM_MOTOR, obs_dim=98, history_len=1):
+                 action_dim=G1_NUM_MOTOR, obs_dim=99, history_len=1):
         self.control_dt = control_dt
         self.mode_machine = 0
         self.low_cmd = unitree_hg_msg_dds__LowCmd_()  

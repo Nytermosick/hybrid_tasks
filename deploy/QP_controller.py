@@ -9,7 +9,7 @@ from robot_env import ObsData
 from hybrid_tasks.assets.robots import F_MAX_Z, MU,\
                                        BASE_POS_KP, BASE_POS_KD, BASE_ORIENT_KP, BASE_ORIENT_KD,\
                                        BODY_HEIGHT_DESIRED,\
-                                       G1_MASS, G1_BASE_INERTIA
+                                       G1_MASS, G1_BASE_INERTIA, QP_YAW_ERROR_LIMIT
 
 from hybrid_tasks.assets.robots import ACTION_SCALE_NP as ACTION_SCALE
 from hybrid_tasks.assets.robots import DEFAULT_JOINT_POS_NP as DEFAULT_JOINT_POS
@@ -53,6 +53,8 @@ class QPController:
 
         self.p_des = np.array([0.0, 0.0, BODY_HEIGHT_DESIRED])
         self.quat_des = np.array([1, 0, 0, 0])
+        self.yaw_des_raw = 0.0
+        self.yaw_error_limit = QP_YAW_ERROR_LIMIT
         self.linear_acc_des = np.zeros(3)
         self.angular_acc_des = np.zeros(3)
 
@@ -95,9 +97,13 @@ class QPController:
         return: actions numpy
         """
         if not self.initialized:
+            self.yaw_des_raw = utils.yaw_from_quat(obs_data.base_quat)
+            self.quat_des = utils.yaw_quat_from_yaw(self.yaw_des_raw)
+            obs_data.yaw_orientation_error = np.zeros(1)
             obs_data.init_obs_buffers()
-            self.quat_des = obs_data.base_quat
             self.initialized = True
+        else:
+            self._update_desired_yaw(obs_data)
 
         obs = obs_data.get_obs_full_vector()
 
@@ -109,9 +115,6 @@ class QPController:
         action = np.asarray(action).reshape(-1)
         obs_data.last_action = action.copy()
 
-        base_ang_vel_des = np.array([0.0, 0.0, obs_data.velocity_commands[2]])
-        self.quat_des = utils.integrate_quat(self.quat_des, base_ang_vel_des, self.control_dt)
-
         # self.desired_linear_acceleration =  Rwbz @ action[29:32] #* 0.5
         # self.desired_angular_acceleration = Rwbz @ action[32:35] #* 0.5
 
@@ -121,7 +124,6 @@ class QPController:
                        np.hstack([O6, obs_data.J_right])])
         
         leg_torques = -J.T @ grf
-        print("leg_torques: ", leg_torques)
 
         scaled_actions = action * ACTION_SCALE
 
@@ -256,3 +258,17 @@ class QPController:
         # print(f"{da=}")
         
         return grf
+    
+    def _update_desired_yaw(self, obs_data: ObsData):
+        current_yaw = utils.yaw_from_quat(obs_data.base_quat)
+        self.yaw_des_raw = utils.wrap_to_pi(
+            self.yaw_des_raw + obs_data.velocity_commands[2] * self.control_dt
+        )
+        yaw_error = utils.wrap_to_pi(self.yaw_des_raw - current_yaw)
+        bounded_yaw_error = np.clip(
+            yaw_error,
+            -self.yaw_error_limit,
+            self.yaw_error_limit,
+        )
+        self.quat_des = utils.yaw_quat_from_yaw(utils.wrap_to_pi(current_yaw + bounded_yaw_error))
+        obs_data.yaw_orientation_error = np.array([yaw_error], dtype=float)

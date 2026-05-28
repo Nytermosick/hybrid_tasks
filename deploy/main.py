@@ -41,7 +41,8 @@ parser.add_argument(
     "--policy_path",
     type=str,
     # default="logs/rsl_rl/g1_vanilla_walk/vanilla/policy.onnx",
-    default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-26_19-32-40_30k/policy.onnx",
+    default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-27_21-22-37_finetuned_for_82k/policy.onnx",
+    # default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-26_19-32-40_30k/policy.onnx",
     # default="logs/rsl_rl/g1_vanilla_walk/2026-05-19_19-00-21/policy.onnx", # with old q_def
     help="Путь до файла политики."
 )
@@ -91,11 +92,16 @@ GAMEPAD_AXIS_COMMANDS = (
     {"cmd_idx": 1, "axis": 0, "sign": -1.0, "max_abs": 0.3},  # left stick X -> vy
     {"cmd_idx": 2, "axis": 3, "sign": -1.0, "max_abs": 1.5},  # right stick X -> wz
 )
+GAMEPAD_DEADZONE = 0.08
 
-def normalize_axis(value, min_raw, max_raw, *, max_abs, sign=1.0):
+def normalize_axis(value, min_raw, max_raw, *, max_abs, sign=1.0, deadzone=GAMEPAD_DEADZONE):
     value = max(min(value, max_raw), min_raw)
     normalized = 2.0 * (value - min_raw) / (max_raw - min_raw) - 1.0
-    return sign * normalized * max_abs
+    normalized *= sign
+    if abs(normalized) < deadzone:
+        return 0.0
+    normalized = (abs(normalized) - deadzone) / (1.0 - deadzone) * (1.0 if normalized > 0.0 else -1.0)
+    return normalized * max_abs
 
 def update_velocity_commands_from_gamepad():
     for axis_cfg in GAMEPAD_AXIS_COMMANDS:
@@ -123,10 +129,10 @@ velocity_commands = [0.0, 0.0, 0.0]
 interface = args.interface
 robot_scene = os.path.join(ROOT_DIR, "external", "unitree_mujoco", "unitree_robots", "g1", "g1_29dof.xml")
 robot_env = G1_Env(interface, robot_scene, control_dt=CONTROL_DT, velocity_commands=velocity_commands,
-                   obs_dim=98, history_len=1, action_dim=G1_NUM_MOTOR)
-# controller = QPController(policy_path=args.policy_path, dt=CONTROL_DT, enable_swing_controller=True, air_fix=args.air_fix)
+                   obs_dim=99, history_len=1, action_dim=G1_NUM_MOTOR)
+
 controller = QPController(policy_path=args.policy_path, dt=CONTROL_DT)
-# controller = SimpleController(policy_path=args.policy_path)
+# controller = SimpleController(policy_path=args.policy_path, dt=CONTROL_DT)
 
 band_enabled = True if interface == "lo" else False # Only for Simulator!
 
