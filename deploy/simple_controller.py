@@ -4,6 +4,7 @@ from robot_env import ObsData
 import utils as utils
 from hybrid_tasks.assets.robots import DEFAULT_JOINT_POS_NP as DEFAULT_JOINT_POS
 from hybrid_tasks.assets.robots import ACTION_SCALE_NP as ACTION_SCALE
+from hybrid_tasks.assets.robots import COMMAND_STANDING_THRESHOLD
 
 class SimpleController:
     def __init__(self, policy_path, dt):
@@ -49,8 +50,10 @@ class SimpleController:
 
     def _update_desired_yaw(self, obs_data: ObsData):
         current_yaw = utils.yaw_from_quat(obs_data.base_quat)
+        total_command = np.linalg.norm(obs_data.velocity_commands[:2]) + abs(obs_data.velocity_commands[2])
+        yaw_rate_des = obs_data.velocity_commands[2] if total_command > COMMAND_STANDING_THRESHOLD else 0.0
         self.yaw_des_raw = utils.wrap_to_pi(
-            self.yaw_des_raw + obs_data.velocity_commands[2] * self.control_dt
+            self.yaw_des_raw + yaw_rate_des * self.control_dt
         )
         yaw_error = utils.wrap_to_pi(self.yaw_des_raw - current_yaw)
         obs_data.yaw_orientation_error = np.array([yaw_error], dtype=float)

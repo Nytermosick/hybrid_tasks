@@ -65,6 +65,7 @@ def yaw_orientation_error_l2(
   env: ManagerBasedRlEnv,
   command_name: str,
   error_limit: float | None = None,
+  command_threshold: float = 0.0,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
 ) -> torch.Tensor:
   """Penalize yaw-only error between integrated desired heading and current heading."""
@@ -72,6 +73,7 @@ def yaw_orientation_error_l2(
     env,
     command_name=command_name,
     error_limit=error_limit,
+    command_threshold=command_threshold,
     asset_cfg=asset_cfg,
   ).squeeze(1)
   return torch.square(yaw_error)

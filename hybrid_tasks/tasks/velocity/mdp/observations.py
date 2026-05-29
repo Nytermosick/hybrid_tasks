@@ -58,6 +58,7 @@ def yaw_orientation_error(
   env: ManagerBasedRlEnv,
   command_name: str,
   error_limit: float | None = None,
+  command_threshold: float = 0.0,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
 ) -> torch.Tensor:
   """Yaw-only error between the integrated desired heading and current base heading."""
@@ -73,10 +74,16 @@ def yaw_orientation_error(
 
   reset = env.episode_length_buf == 0
   update = env.episode_length_buf != env._desired_yaw_obs_last_step
+  total_command = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
+  turn_command = torch.where(
+    total_command > command_threshold,
+    command[:, 2],
+    torch.zeros_like(command[:, 2]),
+  )
   updated_desired_yaw = torch.where(
     reset,
     current_yaw,
-    _wrap_to_pi(env._desired_yaw_obs + command[:, 2] * env.step_dt),
+    _wrap_to_pi(env._desired_yaw_obs + turn_command * env.step_dt),
   )
   desired_yaw = torch.where(update, updated_desired_yaw, env._desired_yaw_obs)
   env._desired_yaw_obs = desired_yaw.detach()

@@ -9,7 +9,8 @@ from robot_env import ObsData
 from hybrid_tasks.assets.robots import F_MAX_Z, MU,\
                                        BASE_POS_KP, BASE_POS_KD, BASE_ORIENT_KP, BASE_ORIENT_KD,\
                                        BODY_HEIGHT_DESIRED,\
-                                       G1_MASS, G1_BASE_INERTIA, QP_YAW_ERROR_LIMIT
+                                       G1_MASS, G1_BASE_INERTIA, QP_YAW_ERROR_LIMIT,\
+                                       COMMAND_STANDING_THRESHOLD
 
 from hybrid_tasks.assets.robots import ACTION_SCALE_NP as ACTION_SCALE
 from hybrid_tasks.assets.robots import DEFAULT_JOINT_POS_NP as DEFAULT_JOINT_POS
@@ -142,12 +143,19 @@ class QPController:
         base_quat_z_cur = utils.yaw_quat_from_quat(base_quat_cur)
         Rwbz = utils.quat_to_R_wxyz(base_quat_z_cur)
 
+        # print(f"Base yaw: {utils.yaw_from_quat(base_quat_cur):.3f} rad, Desired yaw: {utils.yaw_from_quat(self.quat_des):.3f} rad")
+
         base_pos_cur = obs_data.base_pos_wf
         base_lin_vel_cur = np.zeros(3)
         base_ang_vel_cur = utils.quat_apply(base_quat_cur, obs_data.base_ang_vel_b)
 
         base_lin_vel_des = Rwbz @ np.array([obs_data.velocity_commands[0], obs_data.velocity_commands[1], 0.0])
-        base_ang_vel_des = np.array([0.0, 0.0, obs_data.velocity_commands[2]])
+
+        yaw_rate_cmd = obs_data.velocity_commands[2]
+        total_command = np.linalg.norm(obs_data.velocity_commands[:2]) + abs(yaw_rate_cmd)
+        yaw_rate_cmd = yaw_rate_cmd if total_command > COMMAND_STANDING_THRESHOLD else 0.0
+
+        base_ang_vel_des = np.array([0.0, 0.0, yaw_rate_cmd])
 
         lin_pos_error = self.p_des - base_pos_cur
         lin_vel_error = base_lin_vel_des - base_lin_vel_cur
@@ -261,8 +269,10 @@ class QPController:
     
     def _update_desired_yaw(self, obs_data: ObsData):
         current_yaw = utils.yaw_from_quat(obs_data.base_quat)
+        total_command = np.linalg.norm(obs_data.velocity_commands[:2]) + abs(obs_data.velocity_commands[2])
+        yaw_rate_des = obs_data.velocity_commands[2] if total_command > COMMAND_STANDING_THRESHOLD else 0.0
         self.yaw_des_raw = utils.wrap_to_pi(
-            self.yaw_des_raw + obs_data.velocity_commands[2] * self.control_dt
+            self.yaw_des_raw + yaw_rate_des * self.control_dt
         )
         yaw_error = utils.wrap_to_pi(self.yaw_des_raw - current_yaw)
         bounded_yaw_error = np.clip(

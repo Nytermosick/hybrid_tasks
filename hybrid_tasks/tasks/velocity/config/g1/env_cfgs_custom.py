@@ -44,6 +44,7 @@ def g1_vanilla_walk_flat_env_cfg(
     "asset_cfg"
   ].site_names = site_names
   cfg.observations["actor"].terms["gait_phase"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
+  cfg.observations["actor"].terms["yaw_orientation_error"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
 
   cfg.events["foot_friction"].params["asset_cfg"].geom_names = geom_names
   cfg.events["base_com"].params["asset_cfg"].body_names = ("torso_link",)
@@ -97,6 +98,7 @@ def g1_vanilla_walk_flat_env_cfg(
   cfg.rewards["foot_gait"].params["offset"] = GAIT_OFFSET
   cfg.rewards["foot_gait"].params["threshold"] = GAIT_THRESHOLD
   cfg.rewards["foot_gait"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
+  cfg.rewards["yaw_orientation_error_l2"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
 
   cfg.rewards["foot_clearance"].params["target_height"] = FOOT_CLEARANCE
   

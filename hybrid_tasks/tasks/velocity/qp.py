@@ -139,13 +139,20 @@ def solveQP(
     v_des = math_utils.quat_apply(qRwbz, v_des) # TODO: Или на qRwb?
 
     w_des[:, 2] = command[:, 2]
+    total_command = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
+    yaw_rate_des = torch.where(
+        total_command > COMMAND_STANDING_THRESHOLD,
+        w_des[:, 2],
+        torch.zeros_like(w_des[:, 2]),
+    )
+    w_des[:, 2] = yaw_rate_des
 
     current_yaw = _yaw_from_quat(qRwbz)
     update_yaw_des = env.episode_length_buf != qpcfg.yaw_des_last_step
     updated_raw_yaw_des = torch.where(
         env.episode_length_buf == 0,
         current_yaw,
-        _wrap_to_pi(qpcfg.yaw_des_raw + w_des[:, 2] * env.step_dt),
+        _wrap_to_pi(qpcfg.yaw_des_raw + yaw_rate_des * env.step_dt),
     )
     raw_yaw_des = torch.where(update_yaw_des, updated_raw_yaw_des, qpcfg.yaw_des_raw)
     qpcfg.yaw_des_raw = raw_yaw_des.detach()

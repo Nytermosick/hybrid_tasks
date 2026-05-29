@@ -81,7 +81,7 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
     "yaw_orientation_error": ObservationTermCfg(
       func=mdp.yaw_orientation_error,
-      params={"command_name": "twist"},
+      params={"command_name": "twist", "command_threshold": 0.1},
     ),
     "joint_pos_rel": ObservationTermCfg(
       func=mdp.joint_pos_rel,
@@ -278,7 +278,7 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
     "yaw_orientation_error_l2": RewardTermCfg(
       func=mdp.yaw_orientation_error_l2,
       weight=-0.2,
-      params={"command_name": "twist"},
+      params={"command_name": "twist", "command_threshold": 0.1},
     ),
     "body_orientation_l2": RewardTermCfg(
       func=mdp.body_orientation_l2,
