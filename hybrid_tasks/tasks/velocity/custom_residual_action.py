@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import numpy as np
 import torch
 import mujoco_warp as mjw
 import warp as wp
@@ -49,6 +48,7 @@ class ResidualPositionsAndTorques(JointPositionAction):
 
     self._effort_targets = torch.zeros_like(self._raw_actions)
     self._zero_velocity_targets = torch.zeros_like(self._raw_actions)
+    self._torque_targets = torch.zeros_like(self._raw_actions)
 
     self._foot_names = ("left_foot", "right_foot")
     self._asset_cfg = SceneEntityCfg("robot", site_names=self._foot_names)
@@ -62,7 +62,7 @@ class ResidualPositionsAndTorques(JointPositionAction):
     self._foot_site_ids = self._asset_cfg.site_ids
     foot_frame_ids = self._asset.indexing.site_ids[self._foot_site_ids]
     self._foot_body_ids = (
-      self._asset.data.model.site_bodyid[foot_frame_ids].cpu().numpy()
+      self._asset.data.model.site_bodyid[foot_frame_ids].cpu().tolist()
     )
     self._target_dof_ids = self._asset.indexing.joint_v_adr[
       self._target_ids
@@ -87,6 +87,7 @@ class ResidualPositionsAndTorques(JointPositionAction):
     self._upper_body_target_mask = ~self._leg_target_mask
 
     self._qpcfg = qp.QPCfg(num_envs=self.num_envs, device=self.device)
+    self._init_qp_jacobian_buffers()
 
   @property
   def effort_target(self) -> torch.Tensor:
@@ -98,7 +99,8 @@ class ResidualPositionsAndTorques(JointPositionAction):
     # self._processed_actions[:, self._upper_body_target_mask] = default_joint_pos[
     #   :, self._upper_body_target_mask]
     if self.cfg.use_qp_torques:
-      self._effort_targets[:] = self._compute_qp_torques()
+      with torch.no_grad():
+        self._effort_targets[:] = self._compute_qp_torques()
     else:
       self._effort_targets[:] = 0.0
 
@@ -131,37 +133,61 @@ class ResidualPositionsAndTorques(JointPositionAction):
 
   def _compute_qp_torques(self) -> torch.Tensor:
     foot_wrenches = qp.solveQP(self._env, self._qpcfg)
-    foot_pos_w = self._asset.data.site_pos_w[:, self._foot_site_ids, :].cpu().numpy()
-    torque_targets = torch.zeros_like(self._effort_targets)
+    foot_pos_w = self._asset.data.site_pos_w[:, self._foot_site_ids, :]
+    self._torque_targets.zero_()
 
-    for foot_id, body_id in enumerate(self._foot_body_ids):
+    for foot_id in range(len(self._foot_names)):
+      self._foot_points_torch[foot_id].copy_(foot_pos_w[:, foot_id, :])
       with wp.ScopedDevice(self._env.sim.wp_device):
-        point_wp = wp.array(foot_pos_w[:, foot_id, :], dtype=wp.vec3)
-        body_wp = wp.array(
-          np.full((self.num_envs,), body_id, dtype=np.int32), dtype=wp.int32
+        mjw.jac(
+          self._wp_model,
+          self._wp_data,
+          self._jacp_wp[foot_id],
+          self._jacr_wp[foot_id],
+          self._foot_points_wp[foot_id],
+          self._foot_body_wp[foot_id],
         )
 
-        jacp_wp = wp.zeros((self.num_envs, 3, self._nv), dtype=float)
-        jacr_wp = wp.zeros((self.num_envs, 3, self._nv), dtype=float)
-        mjw.jac(self._wp_model, self._wp_data, jacp_wp, jacr_wp, point_wp, body_wp)
-
-      jacp_all = wp.to_torch(jacp_wp)
-      jacr_all = wp.to_torch(jacr_wp)
+      jacp_all = self._jacp_torch[foot_id]
+      jacr_all = self._jacr_torch[foot_id]
       target_dof_ids = self._target_dof_ids.to(jacp_all.device)
       jacp = jacp_all[:, :, target_dof_ids].to(self.device)
       jacr = jacr_all[:, :, target_dof_ids].to(self.device)
 
       force = foot_wrenches[foot_id][:, 0:3, :]
       moment = foot_wrenches[foot_id][:, 3:6, :]
-      torque_targets += -torch.bmm(jacp.transpose(1, 2), force).squeeze(-1)
-      torque_targets += -torch.bmm(jacr.transpose(1, 2), moment).squeeze(-1)
-    
+      self._torque_targets += -torch.bmm(jacp.transpose(1, 2), force).squeeze(-1)
+      self._torque_targets += -torch.bmm(jacr.transpose(1, 2), moment).squeeze(-1)
+
     qfrc_bias = self._asset.data.data.qfrc_bias
     target_dof_ids = self._target_dof_ids.to(qfrc_bias.device)
 
-    torques = torque_targets + qfrc_bias[:, target_dof_ids].to(self.device)
+    self._torque_targets += qfrc_bias[:, target_dof_ids].to(self.device)
     # torque_targets[:, ~self._leg_target_mask] = 0.0
-    return torques # TODO: Кориолисовы силы могут быть чувствительными к скоростям суставов
+    return self._torque_targets # TODO: Кориолисовы силы могут быть чувствительными к скоростям суставов
+
+  def _init_qp_jacobian_buffers(self) -> None:
+    self._foot_points_wp = []
+    self._foot_points_torch = []
+    self._foot_body_wp = []
+    self._jacp_wp = []
+    self._jacr_wp = []
+    self._jacp_torch = []
+    self._jacr_torch = []
+    with wp.ScopedDevice(self._env.sim.wp_device):
+      for body_id in self._foot_body_ids:
+        point_wp = wp.zeros((self.num_envs,), dtype=wp.vec3)
+        body_wp = wp.zeros(self.num_envs, dtype=wp.int32)
+        body_wp.fill_(int(body_id))
+        jacp_wp = wp.zeros((self.num_envs, 3, self._nv), dtype=float)
+        jacr_wp = wp.zeros((self.num_envs, 3, self._nv), dtype=float)
+        self._foot_points_wp.append(point_wp)
+        self._foot_points_torch.append(wp.to_torch(point_wp).view(self.num_envs, 3))
+        self._foot_body_wp.append(body_wp)
+        self._jacp_wp.append(jacp_wp)
+        self._jacr_wp.append(jacr_wp)
+        self._jacp_torch.append(wp.to_torch(jacp_wp))
+        self._jacr_torch.append(wp.to_torch(jacr_wp))
 
   def _bias_torques(self) -> torch.Tensor:
     qfrc_bias = self._asset.data.data.qfrc_bias
