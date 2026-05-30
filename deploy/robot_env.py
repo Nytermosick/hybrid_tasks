@@ -109,8 +109,14 @@ class ObsData:
 
 class G1_Env:
     def __init__(self, interface, xml_path, control_dt, velocity_commands=[0, 0, 0],
-                 action_dim=G1_NUM_MOTOR, obs_dim=99, history_len=1):
+                 action_dim=G1_NUM_MOTOR, obs_dim=99, history_len=1,
+                 gait_stop_transition_time=1.0):
         self.control_dt = control_dt
+
+        self.gait_stop_transition_time = gait_stop_transition_time
+        self.gait_active_until = 0.0
+        self.last_active_gait_command = np.zeros(3)
+        
         self.mode_machine = 0
         self.low_cmd = unitree_hg_msg_dds__LowCmd_()  
         self.low_state = None 
@@ -355,20 +361,26 @@ class G1_Env:
         mass_matrix = 0.5 * (mass_matrix + mass_matrix.T)
 
         self.time += self.control_dt
+        command = np.asarray(self.velocity_commands, dtype=float)
+        command_norm = np.linalg.norm(command[:2]) + abs(command[2])
+        if command_norm > COMMAND_STANDING_THRESHOLD:
+            self.gait_active_until = self.time + self.gait_stop_transition_time
+            self.last_active_gait_command = command.copy()
+        gait_command = self.last_active_gait_command if self.time <= self.gait_active_until else np.zeros_like(command)
 
         is_stance = compute_gait_stance(
             self.time,
             GAIT_PERIOD,
             GAIT_OFFSET,
             GAIT_THRESHOLD,
-            self.velocity_commands,
+            gait_command,
             COMMAND_STANDING_THRESHOLD,
         )
 
         gait_phase = compute_gait_phase(
             self.time,
             GAIT_PERIOD,
-            self.velocity_commands,
+            gait_command,
             COMMAND_STANDING_THRESHOLD,
         )
 

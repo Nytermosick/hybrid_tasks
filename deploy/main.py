@@ -87,7 +87,7 @@ GAMEPAD_AXIS_COMMANDS = (
     {"cmd_idx": 2, "axis": 3, "sign": -1.0, "max_abs": 1.5},  # right stick X -> wz
 )
 GAMEPAD_DEADZONE = 0.08
-COMMAND_RATE_LIMIT = np.array([1.0, 1.2, 3.0])
+COMMAND_RATE_LIMIT = np.array([0.7, 1.2, 3.0])
 target_velocity_commands = np.zeros(3, dtype=float)
 
 def normalize_axis(value, min_raw, max_raw, *, max_abs, sign=1.0, deadzone=GAMEPAD_DEADZONE):
@@ -110,10 +110,11 @@ def update_velocity_commands_from_gamepad():
             max_abs=axis_cfg["max_abs"],
             sign=axis_cfg["sign"],
         )
-    current = np.asarray(robot_env.velocity_commands, dtype=float)
-    max_delta = np.asarray(COMMAND_RATE_LIMIT, dtype=float) * CONTROL_DT
-    next_command = current + np.clip(target_velocity_commands - current, -max_delta, max_delta)
-    robot_env.velocity_commands[:] = next_command.tolist()
+    # current = np.asarray(robot_env.velocity_commands, dtype=float)
+    # max_delta = np.asarray(COMMAND_RATE_LIMIT, dtype=float) * CONTROL_DT
+    # next_command = current + np.clip(target_velocity_commands - current, -max_delta, max_delta)
+    # robot_env.velocity_commands[:] = next_command.tolist()
+    robot_env.velocity_commands[:] = target_velocity_commands.tolist()
 
 if args.joystick_on:
     device_path = find_gamepad_event()
