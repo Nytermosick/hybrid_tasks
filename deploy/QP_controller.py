@@ -281,4 +281,4 @@ class QPController:
             self.yaw_error_limit,
         )
         self.quat_des = utils.yaw_quat_from_yaw(utils.wrap_to_pi(current_yaw + bounded_yaw_error))
-        obs_data.yaw_orientation_error = np.array([yaw_error], dtype=float)
+        obs_data.yaw_orientation_error = np.array([bounded_yaw_error], dtype=float)

@@ -3,6 +3,7 @@ import time
 from pynput import keyboard
 import argparse
 import threading
+import numpy as np
 from evdev import InputDevice, ecodes
 
 from utils import find_gamepad_event
@@ -26,12 +27,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--air_fix",
-    action="store_true",
-    help="Для тестов робота в воздухе"
-)
-
-parser.add_argument(
     "--joystick_on",
     action="store_true",
     help="Для подключения управления с помощью джойстика пропишите данный аргумент"
@@ -40,10 +35,9 @@ parser.add_argument(
 parser.add_argument(
     "--policy_path",
     type=str,
-    # default="logs/rsl_rl/g1_vanilla_walk/vanilla/policy.onnx",
-    default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-27_21-22-37_finetuned_for_82k/policy.onnx",
-    # default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-26_19-32-40_30k/policy.onnx",
-    # default="logs/rsl_rl/g1_vanilla_walk/2026-05-19_19-00-21/policy.onnx", # with old q_def
+    # default="logs/rsl_rl/g1_vanilla_walk/vanilla/policy.onnx", # without yaw_error
+    # default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-27_21-22-37_finetuned_for_82k/policy.onnx", # without yaw_error
+    default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-29_16-01-00_qp_with_yaw_error_finetuned_39k/policy.onnx",
     help="Путь до файла политики."
 )
 
@@ -93,6 +87,8 @@ GAMEPAD_AXIS_COMMANDS = (
     {"cmd_idx": 2, "axis": 3, "sign": -1.0, "max_abs": 1.5},  # right stick X -> wz
 )
 GAMEPAD_DEADZONE = 0.08
+COMMAND_RATE_LIMIT = np.array([1.0, 1.2, 3.0])
+target_velocity_commands = np.zeros(3, dtype=float)
 
 def normalize_axis(value, min_raw, max_raw, *, max_abs, sign=1.0, deadzone=GAMEPAD_DEADZONE):
     value = max(min(value, max_raw), min_raw)
@@ -104,15 +100,20 @@ def normalize_axis(value, min_raw, max_raw, *, max_abs, sign=1.0, deadzone=GAMEP
     return normalized * max_abs
 
 def update_velocity_commands_from_gamepad():
+    global target_velocity_commands
     for axis_cfg in GAMEPAD_AXIS_COMMANDS:
         abs_info = gamepad.absinfo(axis_cfg["axis"])
-        robot_env.velocity_commands[axis_cfg["cmd_idx"]] = normalize_axis(
+        target_velocity_commands[axis_cfg["cmd_idx"]] = normalize_axis(
             abs_info.value,
             abs_info.min,
             abs_info.max,
             max_abs=axis_cfg["max_abs"],
             sign=axis_cfg["sign"],
         )
+    current = np.asarray(robot_env.velocity_commands, dtype=float)
+    max_delta = np.asarray(COMMAND_RATE_LIMIT, dtype=float) * CONTROL_DT
+    next_command = current + np.clip(target_velocity_commands - current, -max_delta, max_delta)
+    robot_env.velocity_commands[:] = next_command.tolist()
 
 if args.joystick_on:
     device_path = find_gamepad_event()

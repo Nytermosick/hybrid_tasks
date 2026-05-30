@@ -44,7 +44,7 @@ def g1_vanilla_walk_flat_env_cfg(
     "asset_cfg"
   ].site_names = site_names
   cfg.observations["actor"].terms["gait_phase"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
-  cfg.observations["actor"].terms["yaw_orientation_error"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
+  # cfg.observations["actor"].terms["yaw_orientation_error"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
 
   cfg.events["foot_friction"].params["asset_cfg"].geom_names = geom_names
   cfg.events["base_com"].params["asset_cfg"].body_names = ("torso_link",)
@@ -98,7 +98,7 @@ def g1_vanilla_walk_flat_env_cfg(
   cfg.rewards["foot_gait"].params["offset"] = GAIT_OFFSET
   cfg.rewards["foot_gait"].params["threshold"] = GAIT_THRESHOLD
   cfg.rewards["foot_gait"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
-  cfg.rewards["yaw_orientation_error_l2"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
+  # cfg.rewards["yaw_orientation_error_l2"].params["command_threshold"] = COMMAND_STANDING_THRESHOLD
 
   cfg.rewards["foot_clearance"].params["target_height"] = FOOT_CLEARANCE
   
@@ -108,8 +108,8 @@ def g1_vanilla_walk_flat_env_cfg(
     cfg.events.pop("push_robot", None)
     cfg.curriculum = {}
 
-    twist_cmd.ranges.lin_vel_x = (-1.0, 2.0)
-    twist_cmd.ranges.lin_vel_y = (-1.0, 1.0)
+    twist_cmd.ranges.lin_vel_x = (-1.1, 1.1)
+    twist_cmd.ranges.lin_vel_y = (-0.3, 0.3)
     twist_cmd.ranges.ang_vel_z = (-1.5, 1.5)
 
   return cfg
