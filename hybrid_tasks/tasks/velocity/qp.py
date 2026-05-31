@@ -236,9 +236,11 @@ def solveQP(
     a_des_lin = Kpl * (p_des - p_act) + Kdl * (v_des - v_act)
     a_des_ang = Kpa * ori_err + Kda * (w_des - w_act)
     a_des = torch.cat([a_des_lin, a_des_ang], dim=1)
+    if a_policy is not None:
+        a_policy = a_policy.to(device=env.device, dtype=a_des.dtype)
+        a_des[:, :3] += math_utils.quat_apply(qRwbz, a_policy[:, :3])
+        a_des[:, 3:] += math_utils.quat_apply(qRwbz, a_policy[:, 3:])
     # print("a_des:", a_des)
-    # a_des[:, :3] += math_utils.quat_apply(qRwbz, a_policy[:, :3])  # a_policy should be in projected frame!
-    # a_des[:, 3:] += math_utils.quat_apply(qRwbz, a_policy[:, 3:])  # a_policy should be in projected frame!
 
     # print("p_act:\n", p_act)
     # print("v_act:\n", v_act)

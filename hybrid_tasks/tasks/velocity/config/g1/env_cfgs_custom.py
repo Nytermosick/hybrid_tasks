@@ -125,10 +125,7 @@ def g1_qp_without_acc_walk_flat_env_cfg(
   assert isinstance(joint_pos_action, ResidualPositionsAndTorquesCfg)
   joint_pos_action.use_qp_torques = True
 
-  if play:
-    cfg.commands["twist"].ranges.lin_vel_x = (-1.1, 1.1)
-    cfg.commands["twist"].ranges.lin_vel_y = (-0.3, 0.3)
-    cfg.commands["twist"].ranges.ang_vel_z = (-1.5, 1.5)
+  # if play:
     # cfg.commands["twist"].ranges.lin_vel_x = (0.0, 0.0)
     # cfg.commands["twist"].ranges.lin_vel_y = (0.0, 0.0)
     # cfg.commands["twist"].ranges.ang_vel_z = (0.0, 0.0)
@@ -143,5 +140,17 @@ def g1_qp_without_acc_walk_flat_env_cfg(
     # cfg.events["reset_robot_joints"].params["position_range"] = (-0.0, 0.0)
     # cfg.events["reset_robot_joints"].params["velocity_range"] = (-0.0, 0.0)
 
+
+  return cfg
+
+def g1_qp_with_acc_walk_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 flat walking configuration with QP torques and accelerations in the policy."""
+  cfg = g1_qp_without_acc_walk_flat_env_cfg(play=play)
+
+  joint_pos_action = cfg.actions["joint_pos"]
+  assert isinstance(joint_pos_action, ResidualPositionsAndTorquesCfg)
+  joint_pos_action.use_policy_base_accel = True
 
   return cfg

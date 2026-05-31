@@ -14,6 +14,7 @@ from mjlab.envs.mdp.actions import JointPositionAction, JointPositionActionCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 
 from hybrid_tasks.tasks.velocity import qp
+from hybrid_tasks.assets.robots import BASE_ACCEL_ACTION_SCALE
 
 if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
@@ -27,12 +28,15 @@ class ResidualPositionsAndTorquesCfg(JointPositionActionCfg):
   """Residual joint-position action plus feedforward torques from QP.
 
   This inherits the standard ``JointPositionAction`` behavior:
-  The policy action dimension is unchanged. Joint position targets come from the
-  policy. When ``use_qp_torques`` is true, feedforward torques are computed
-  internally from QP contact wrenches and foot Jacobians.
+  Joint position targets come from the policy. When ``use_qp_torques`` is true,
+  feedforward torques are computed internally from QP contact wrenches and foot
+  Jacobians. If ``use_policy_base_accel`` is enabled, the policy action is
+  extended with six base acceleration residuals: linear xyz and angular xyz.
   """
 
   use_qp_torques: bool = True
+  use_policy_base_accel: bool = False
+  base_accel_scale: tuple[float, float, float, float, float, float] = tuple(BASE_ACCEL_ACTION_SCALE)
 
   def build(self, env: ManagerBasedRlEnv) -> ResidualPositionsAndTorques:
     return ResidualPositionsAndTorques(self, env)
@@ -45,6 +49,19 @@ class ResidualPositionsAndTorques(JointPositionAction):
 
   def __init__(self, cfg: ResidualPositionsAndTorquesCfg, env: ManagerBasedRlEnv):
     super().__init__(cfg=cfg, env=env)
+
+    self._joint_action_dim = self._num_targets
+    self._base_accel_action_dim = 6 if self.cfg.use_policy_base_accel else 0
+    self._action_dim = self._joint_action_dim + self._base_accel_action_dim
+    self._policy_raw_actions = torch.zeros(
+      self.num_envs, self._action_dim, device=self.device
+    )
+    self._base_accel_actions = torch.zeros(self.num_envs, 6, device=self.device)
+    self._base_accel_scale = torch.tensor(
+      self.cfg.base_accel_scale,
+      device=self.device,
+      dtype=self._raw_actions.dtype,
+    ).view(1, 6)
 
     self._effort_targets = torch.zeros_like(self._raw_actions)
     self._zero_velocity_targets = torch.zeros_like(self._raw_actions)
@@ -94,7 +111,21 @@ class ResidualPositionsAndTorques(JointPositionAction):
     return self._effort_targets
 
   def process_actions(self, actions: torch.Tensor) -> None:
-    super().process_actions(actions)
+    self._policy_raw_actions[:] = actions
+    joint_actions = actions[:, : self._joint_action_dim]
+    self._raw_actions[:] = joint_actions
+    self._processed_actions = self._raw_actions * self._scale + self._offset
+    if self.cfg.clip is not None:
+      self._processed_actions = torch.clamp(
+        self._processed_actions,
+        min=self._clip[:, :, 0],
+        max=self._clip[:, :, 1],
+      )
+    if self.cfg.use_policy_base_accel:
+      base_accel_actions = actions[:, self._joint_action_dim : self._joint_action_dim + 6]
+      self._base_accel_actions[:] = base_accel_actions * self._base_accel_scale
+    else:
+      self._base_accel_actions.zero_()
     # default_joint_pos = self._entity.data.default_joint_pos[:, self._target_ids]
     # self._processed_actions[:, self._upper_body_target_mask] = default_joint_pos[
     #   :, self._upper_body_target_mask]
@@ -132,7 +163,8 @@ class ResidualPositionsAndTorques(JointPositionAction):
     )
 
   def _compute_qp_torques(self) -> torch.Tensor:
-    foot_wrenches = qp.solveQP(self._env, self._qpcfg)
+    base_accel_actions =  self._base_accel_actions if self.cfg.use_policy_base_accel else None
+    foot_wrenches = qp.solveQP(self._env, self._qpcfg, base_accel_actions)
     foot_pos_w = self._asset.data.site_pos_w[:, self._foot_site_ids, :]
     self._torque_targets.zero_()
 
@@ -233,4 +265,6 @@ class ResidualPositionsAndTorques(JointPositionAction):
     if env_ids is None:
       env_ids = slice(None)
     super().reset(env_ids=env_ids)
+    self._policy_raw_actions[env_ids] = 0.0
+    self._base_accel_actions[env_ids] = 0.0
     self._effort_targets[env_ids] = 0.0

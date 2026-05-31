@@ -19,6 +19,8 @@ G1_BASE_INERTIA = np.array([
     [0.04, -0.001, 0.488],
 ])
 
+BASE_ACCEL_ACTION_SCALE = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+
 CONTROL_DT = 0.01
 
 GAIT_PERIOD = 0.8
