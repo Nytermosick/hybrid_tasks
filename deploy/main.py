@@ -132,11 +132,19 @@ velocity_commands = [0.0, 0.0, 0.0]
 
 interface = args.interface
 robot_scene = os.path.join(ROOT_DIR, "external", "unitree_mujoco", "unitree_robots", "g1", "g1_29dof.xml")
-robot_env = G1_Env(interface, robot_scene, control_dt=CONTROL_DT, velocity_commands=velocity_commands,
-                   obs_dim=98, history_len=1, action_dim=G1_NUM_MOTOR)
-
 controller = QPController(policy_path=args.policy_path, dt=CONTROL_DT)
 # controller = SimpleController(policy_path=args.policy_path, dt=CONTROL_DT)
+
+BASE_OBS_DIM_WITHOUT_LAST_ACTION = 98 - G1_NUM_MOTOR
+robot_env = G1_Env(
+    interface,
+    robot_scene,
+    control_dt=CONTROL_DT,
+    velocity_commands=velocity_commands,
+    obs_dim=BASE_OBS_DIM_WITHOUT_LAST_ACTION + controller.action_dim,
+    history_len=1,
+    action_dim=controller.action_dim,
+)
 
 band_enabled = True if interface == "lo" else False # Only for Simulator!
 

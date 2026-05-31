@@ -10,7 +10,7 @@ from hybrid_tasks.assets.robots import F_MAX_Z, MU,\
                                        BASE_POS_KP, BASE_POS_KD, BASE_ORIENT_KP, BASE_ORIENT_KD,\
                                        BODY_HEIGHT_DESIRED,\
                                        G1_MASS, G1_BASE_INERTIA, QP_YAW_ERROR_LIMIT,\
-                                       COMMAND_STANDING_THRESHOLD
+                                       COMMAND_STANDING_THRESHOLD, BASE_ACCEL_ACTION_SCALE
 
 from hybrid_tasks.assets.robots import ACTION_SCALE_NP as ACTION_SCALE
 from hybrid_tasks.assets.robots import DEFAULT_JOINT_POS_NP as DEFAULT_JOINT_POS
@@ -42,6 +42,10 @@ class QPController:
         self.session = ort.InferenceSession(policy_path, providers=["CPUExecutionProvider"])
 
         self.control_dt = dt
+        self.joint_action_dim = ACTION_SCALE.shape[0]
+        self.base_accel_action_dim = 6
+        self.action_dim = self._infer_policy_action_dim()
+        self.uses_policy_base_accel = self.action_dim == self.joint_action_dim + self.base_accel_action_dim
 
         self.Kpl = BASE_POS_KP
         self.Kdl = BASE_POS_KD
@@ -86,6 +90,11 @@ class QPController:
 
         self.prev_grf = np.zeros(12)
 
+    def _infer_policy_action_dim(self) -> int:
+        output_shape = self.session.get_outputs()[0].shape
+        output_dim = output_shape[-1]
+        return output_dim
+
     def _osqp_setup(self, P, q, A, l, u, verbose=False, eps_abs=1e-5, eps_rel=1e-5, max_iter=1000, polish=False):
         self.prob = osqp.OSQP()
         self.prob.setup(P=P, q=q, A=A, l=l, u=u, verbose=verbose, eps_abs=eps_abs, eps_rel=eps_rel, max_iter=max_iter, polish=polish)
@@ -116,8 +125,8 @@ class QPController:
         action = np.asarray(action).reshape(-1)
         obs_data.last_action = action.copy()
 
-        # self.desired_linear_acceleration =  Rwbz @ action[29:32] #* 0.5
-        # self.desired_angular_acceleration = Rwbz @ action[32:35] #* 0.5
+        if self.uses_policy_base_accel:
+            self._update_policy_base_accel(action, obs_data)
 
         grf = self.solveQP(obs_data)
 
@@ -126,7 +135,8 @@ class QPController:
         
         leg_torques = -J.T @ grf
 
-        scaled_actions = action * ACTION_SCALE
+        joint_action = action[:self.joint_action_dim]
+        scaled_actions = joint_action * ACTION_SCALE
 
         full_torques = obs_data.bias_torques[6:].copy()
         full_torques[:12] += leg_torques
@@ -135,6 +145,16 @@ class QPController:
         full_dq = np.zeros_like(full_q)
 
         return full_torques, full_q, full_dq
+
+    def _update_policy_base_accel(self, action: np.ndarray, obs_data: ObsData):
+        base_accel_action = (
+            action[self.joint_action_dim : self.joint_action_dim + self.base_accel_action_dim]
+            * BASE_ACCEL_ACTION_SCALE
+        )
+        base_quat_z_cur = utils.yaw_quat_from_quat(obs_data.base_quat)
+        Rwbz = utils.quat_to_R_wxyz(base_quat_z_cur)
+        self.linear_acc_des[:] = Rwbz @ base_accel_action[:3]
+        self.angular_acc_des[:] = Rwbz @ base_accel_action[3:]
     
     def solveQP(self, obs_data: ObsData):
 
