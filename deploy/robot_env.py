@@ -102,7 +102,7 @@ class ObsData:
         laction = np.concatenate(list(self.obs_last_action), axis=0)
         gphase = np.concatenate(list(self.obs_gait_phase), axis=0)
 
-        obs_full = np.concatenate([base_ang, proj_g, vel_cmd, yaw_err, jpos, jvel, laction, gphase], axis=0).astype(np.float32)
+        obs_full = np.concatenate([base_ang, proj_g, vel_cmd, jpos, jvel, laction, gphase], axis=0).astype(np.float32)
 
         return obs_full
 

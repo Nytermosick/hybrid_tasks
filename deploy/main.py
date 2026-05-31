@@ -37,7 +37,9 @@ parser.add_argument(
     type=str,
     # default="logs/rsl_rl/g1_vanilla_walk/vanilla/policy.onnx", # without yaw_error
     # default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-27_21-22-37_finetuned_for_82k/policy.onnx", # without yaw_error
-    default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-29_16-01-00_qp_with_yaw_error_finetuned_39k/policy.onnx",
+    # default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-29_16-01-00_qp_with_yaw_error_finetuned_39k/policy.onnx", # with yaw_error
+    # default="logs/rsl_rl/g1_vanilla_walk/2026-05-30_17-57-52_30k/policy.onnx", # without yaw_error
+    default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-31_01-32-09_30k/policy.onnx", # without yaw_error
     help="Путь до файла политики."
 )
 
@@ -131,7 +133,7 @@ velocity_commands = [0.0, 0.0, 0.0]
 interface = args.interface
 robot_scene = os.path.join(ROOT_DIR, "external", "unitree_mujoco", "unitree_robots", "g1", "g1_29dof.xml")
 robot_env = G1_Env(interface, robot_scene, control_dt=CONTROL_DT, velocity_commands=velocity_commands,
-                   obs_dim=99, history_len=1, action_dim=G1_NUM_MOTOR)
+                   obs_dim=98, history_len=1, action_dim=G1_NUM_MOTOR)
 
 controller = QPController(policy_path=args.policy_path, dt=CONTROL_DT)
 # controller = SimpleController(policy_path=args.policy_path, dt=CONTROL_DT)
