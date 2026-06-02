@@ -13,6 +13,7 @@ class SimpleController:
         self.control_dt = dt
         self.yaw_des_raw = 0.0
         self.initialized = False
+        self.action_dim = self._infer_policy_action_dim()
 
     def step(self, obs_data: ObsData):
         """
@@ -57,3 +58,8 @@ class SimpleController:
         )
         yaw_error = utils.wrap_to_pi(self.yaw_des_raw - current_yaw)
         obs_data.yaw_orientation_error = np.array([yaw_error], dtype=float)
+
+    def _infer_policy_action_dim(self) -> int:
+        output_shape = self.session.get_outputs()[0].shape
+        output_dim = output_shape[-1]
+        return output_dim

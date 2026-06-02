@@ -38,8 +38,12 @@ parser.add_argument(
     # default="logs/rsl_rl/g1_vanilla_walk/vanilla/policy.onnx", # without yaw_error
     # default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-27_21-22-37_finetuned_for_82k/policy.onnx", # without yaw_error
     # default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-29_16-01-00_qp_with_yaw_error_finetuned_39k/policy.onnx", # with yaw_error
-    # default="logs/rsl_rl/g1_vanilla_walk/2026-05-30_17-57-52_30k/policy.onnx", # without yaw_error
-    default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-31_01-32-09_30k/policy.onnx", # without yaw_error
+    # default="logs/rsl_rl/g1_vanilla_walk/daun_policy/policy.onnx", # without yaw_error
+    # default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-31_01-32-09_30k/policy.onnx", # without yaw_error
+
+    # default="logs/rsl_rl/g1_vanilla_walk/2026-05-30_17-57-52_30k/policy.onnx", # vanilla
+    # default="logs/rsl_rl/g1_qp_without_acc_walk/2026-05-31_16-02-11_finetune_50k/policy.onnx", # qp_without_acc
+    default="logs/rsl_rl/g1_qp_with_acc_walk/2026-06-01_19-16-02_50k/policy.onnx", # qp_with_acc
     help="Путь до файла политики."
 )
 

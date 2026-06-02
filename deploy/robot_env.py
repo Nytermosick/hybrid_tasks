@@ -18,6 +18,8 @@ from hybrid_tasks.assets.robots import DEFAULT_JOINT_POS_NP as DEFAULT_JOINT_POS
 from hybrid_tasks.assets.robots import KPj, KDj,\
                                        GAIT_PERIOD, GAIT_OFFSET, GAIT_THRESHOLD,\
                                        COMMAND_STANDING_THRESHOLD, G1_NUM_MOTOR
+from hybrid_tasks.assets.robots.unitree_g1.custom_actuator import MATCHING_DICT
+from hybrid_tasks.assets.robots.unitree_g1.g1_constants_custom import DEFAULT_JOINT_POS as DEFAULT_JOINT_POS_DICT
 
 class Mode:
     PR = 0  # Series Control for Pitch/Roll Joints
@@ -130,6 +132,7 @@ class G1_Env:
         self.default_torques = np.zeros(G1_NUM_MOTOR)
         self.default_q       = DEFAULT_JOINT_POS.copy()
         self.default_dq      = np.zeros(G1_NUM_MOTOR)
+        self._init_motor_characteristic()
 
         self.pin_model = pin.buildModelFromMJCF(xml_path)
 
@@ -150,6 +153,45 @@ class G1_Env:
         self.time = 0.0
 
         self._init_dds(interface)
+
+    def _init_motor_characteristic(self):
+        actuator_params = [MATCHING_DICT[name] for name in DEFAULT_JOINT_POS_DICT.keys()]
+        self.motor_tau_acc = np.array([params.tau_acc for params in actuator_params], dtype=float)
+        self.motor_tau_br = np.array([params.tau_br for params in actuator_params], dtype=float)
+        self.motor_v1 = np.array([params.v1 for params in actuator_params], dtype=float)
+        self.motor_v2 = np.array([params.v2 for params in actuator_params], dtype=float)
+
+    def _get_current_motor_state(self):
+        if self.low_state is None:
+            return None, None
+
+        with self.lock:
+            motors = self.low_state.motor_state
+            q_cur = np.array([motors[i].q for i in range(G1_NUM_MOTOR)], dtype=float)
+            dq_cur = np.array([motors[i].dq for i in range(G1_NUM_MOTOR)], dtype=float)
+        return q_cur, dq_cur
+
+    def _apply_motor_characteristic(self, *, tau, q, dq, Kp, Kd):
+        q_cur, dq_cur = self._get_current_motor_state()
+        if q_cur is None:
+            return tau
+
+        raw_torques = tau + Kp * (q - q_cur) + Kd * (dq - dq_cur)
+
+        motoring_mask = (dq_cur * raw_torques) > 1e-6
+        tau_max_0 = np.where(motoring_mask, self.motor_tau_acc, self.motor_tau_br)
+
+        v_abs = np.abs(dq_cur)
+        denom = np.maximum(self.motor_v2 - self.motor_v1, 1e-6)
+        linear_scale = 1.0 - (v_abs - self.motor_v1) / denom
+        linear_scale = np.clip(linear_scale, 0.0, 1.0)
+
+        tau_limit = np.where(v_abs < self.motor_v1, tau_max_0, tau_max_0 * linear_scale)
+        tau_limit = np.where(v_abs > self.motor_v2, 0.0, tau_limit)
+
+        clipped_torques = np.clip(raw_torques, -tau_limit, tau_limit)
+        pd_torques = Kp * (q - q_cur) + Kd * (dq - dq_cur)
+        return clipped_torques - pd_torques
 
     def _ensure_foot_site_frames(self):
         foot_sites = {
@@ -305,6 +347,14 @@ class G1_Env:
         self.lowcmd_publisher_.Write(self.low_cmd)
 
     def send_low_cmd_msg(self, *, tau, q, dq, Kp=KPj, Kd=KDj):
+        tau = np.asarray(tau, dtype=float)
+        q = np.asarray(q, dtype=float)
+        dq = np.asarray(dq, dtype=float)
+        Kp = np.asarray(Kp, dtype=float)
+        Kd = np.asarray(Kd, dtype=float)
+
+        tau = self._apply_motor_characteristic(tau=tau, q=q, dq=dq, Kp=Kp, Kd=Kd)
+
         self._fill_msg(tau=tau, 
                        q=q, 
                        dq=dq,
