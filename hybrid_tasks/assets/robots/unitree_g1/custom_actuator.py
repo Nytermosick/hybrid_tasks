@@ -17,6 +17,9 @@ class CustomActuator:
     effort_limit: float 
     stiffness:    float 
     damping:      float 
+    fs:           float = 0.0
+    fd:           float = 0.0
+    va:           float = 0.01
 
 # Motor specs (from Unitree).
 ROTOR_INERTIAS_5020 = (
@@ -95,7 +98,9 @@ ACTUATOR_5020 = CustomActuator(
     v2 = 40.13,
     effort_limit = 25.0,
     stiffness = STIFFNESS_5020,
-    damping = DAMPING_5020
+    damping = DAMPING_5020,
+    fs = 0.6,
+    fd = 0.06
 )
 
 ACTUATOR_7520_14 = CustomActuator(
@@ -105,7 +110,9 @@ ACTUATOR_7520_14 = CustomActuator(
     v2 = 35.52,
     effort_limit = 88.0,
     stiffness = STIFFNESS_7520_14,
-    damping = DAMPING_7520_14
+    damping = DAMPING_7520_14,
+    fs = 1.6,
+    fd = 0.16
 )
 
 ACTUATOR_7520_22 = CustomActuator(
@@ -115,7 +122,9 @@ ACTUATOR_7520_22 = CustomActuator(
     v2 = 22.70,
     effort_limit = 139.0,
     stiffness = STIFFNESS_7520_22,
-    damping = DAMPING_7520_22
+    damping = DAMPING_7520_22,
+    fs = 2.4,
+    fd = 0.24
 )
 
 ACTUATOR_4010 = CustomActuator(
@@ -125,26 +134,34 @@ ACTUATOR_4010 = CustomActuator(
     v2 = 24.76,
     effort_limit = 5.0,
     stiffness = STIFFNESS_4010,
-    damping = DAMPING_4010
+    damping = DAMPING_4010,
+    fs = 0.6,
+    fd = 0.06
 )
 
 ACTUATOR_WAIST = CustomActuator(
   tau_acc = ACTUATOR_5020.tau_acc * 2,
   tau_br = ACTUATOR_5020.tau_br * 2,
-  v1 = ACTUATOR_5020.v1 * 2,
-  v2 = ACTUATOR_5020.v2 * 2,
+  v1 = ACTUATOR_5020.v1,
+  v2 = ACTUATOR_5020.v2,
   effort_limit = ACTUATOR_5020.effort_limit * 2,
   stiffness = STIFFNESS_5020 * 2,
-  damping = DAMPING_5020 * 2
+  damping = DAMPING_5020 * 2,
+  fs = ACTUATOR_5020.fs * 2,
+  fd = ACTUATOR_5020.fd * 2,
+  va = ACTUATOR_5020.va
 )
 ACTUATOR_ANKLE = CustomActuator(
   tau_acc = ACTUATOR_5020.tau_acc * 2,
   tau_br = ACTUATOR_5020.tau_br * 2,
-  v1 = ACTUATOR_5020.v1 * 2,
-  v2 = ACTUATOR_5020.v2 * 2,
+  v1 = ACTUATOR_5020.v1,
+  v2 = ACTUATOR_5020.v2,
   effort_limit = ACTUATOR_5020.effort_limit * 2,
   stiffness = STIFFNESS_5020 * 2,
-  damping = DAMPING_5020 * 2
+  damping = DAMPING_5020 * 2,
+  fs = ACTUATOR_5020.fs * 2,
+  fd = ACTUATOR_5020.fd * 2,
+  va = ACTUATOR_5020.va
 )
 
 MATCHING_DICT = {
@@ -198,6 +215,9 @@ class XmlCustomActuator(XmlActuator):
     self.v2         = torch.tensor(motor_type.v2       ).unsqueeze(0)
     self.kp         = torch.tensor(motor_type.stiffness).unsqueeze(0)
     self.kd         = torch.tensor(motor_type.damping  ).unsqueeze(0)
+    self.fs         = torch.tensor(motor_type.fs       ).unsqueeze(0)
+    self.fd         = torch.tensor(motor_type.fd       ).unsqueeze(0)
+    self.va         = torch.tensor(motor_type.va       ).unsqueeze(0)
 
     self.device_init = False
 
@@ -211,6 +231,9 @@ class XmlCustomActuator(XmlActuator):
         self.v2      = self.v2.to(cmd.pos.device)
         self.kp      = self.kp.to(cmd.pos.device)
         self.kd      = self.kd.to(cmd.pos.device)
+        self.fs      = self.fs.to(cmd.pos.device)
+        self.fd      = self.fd.to(cmd.pos.device)
+        self.va      = self.va.to(cmd.pos.device)
 
         self.device_init = True
 
@@ -257,8 +280,9 @@ class XmlCustomActuator(XmlActuator):
 
     # --- финальный клип ---
     clipped_torques = torch.clamp(raw_torques, -tau_limit, tau_limit)
-    
-    return clipped_torques
+
+    friction_torques = self.fs * torch.tanh(dq_cur / self.va) + self.fd * dq_cur
+    return clipped_torques - friction_torques
   
 @dataclass(kw_only=True)
 class XmlCustomActuatorCfg(XmlActuatorCfg):
