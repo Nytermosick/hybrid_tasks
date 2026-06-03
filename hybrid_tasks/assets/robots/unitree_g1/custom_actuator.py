@@ -281,8 +281,8 @@ class XmlCustomActuator(XmlActuator):
     # --- финальный клип ---
     clipped_torques = torch.clamp(raw_torques, -tau_limit, tau_limit)
 
-    # friction_torques = self.fs * torch.tanh(dq_cur / self.va) + self.fd * dq_cur
-    return clipped_torques #- friction_torques
+    friction_torques = self.fs * torch.tanh(dq_cur / self.va) + self.fd * dq_cur
+    return clipped_torques - friction_torques
   
 @dataclass(kw_only=True)
 class XmlCustomActuatorCfg(XmlActuatorCfg):
