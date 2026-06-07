@@ -159,6 +159,7 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
       scale=0.25,  # Override per-robot.
       use_default_offset=True,
       use_qp_torques=False,
+      use_policy_base_accel=False,
     )
   }
 
@@ -309,7 +310,7 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
       params={"sensor_name": "robot/root_angmom"},
     ),
     "is_terminated": RewardTermCfg(func=mdp.is_terminated, weight=-200.0),
-    "joint_acc_l2": RewardTermCfg(func=mdp.joint_acc_l2, weight=-4e-6),
+    "joint_acc_l2": RewardTermCfg(func=mdp.joint_acc_l2, weight=-2.5e-7),
     "joint_pos_limits": RewardTermCfg(func=mdp.joint_pos_limits, weight=-10.0),
     "action_rate_l2": RewardTermCfg(func=mdp.action_rate_l2, weight=-0.1),
     "foot_gait": RewardTermCfg(

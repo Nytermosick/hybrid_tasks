@@ -63,10 +63,10 @@ def g1_vanilla_walk_flat_env_cfg(
     r".*waist_roll.*": 0.1,
     r".*waist_pitch.*": 0.1,
     # Arms.
-    r".*shoulder_pitch.*": 0.15,
+    r".*shoulder_pitch.*": 0.15 * 2,
     r".*shoulder_roll.*": 0.1,
     r".*shoulder_yaw.*": 0.1,
-    r".*elbow.*": 0.1,
+    r".*elbow.*": 0.1 * 2,
     r".*wrist.*": 0.1,
   }
   cfg.rewards["pose"].params["std_running"] = {
