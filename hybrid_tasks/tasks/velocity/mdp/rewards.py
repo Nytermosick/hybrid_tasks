@@ -192,7 +192,8 @@ def feet_clearance(
   foot_vel_xy = asset.data.site_lin_vel_w[:, asset_cfg.site_ids, :2]  # [B, N, 2]
   vel_norm = torch.norm(foot_vel_xy, dim=-1)  # [B, N]
   delta = torch.abs(foot_z - target_height)  # [B, N]
-  cost = torch.sum(delta * vel_norm, dim=1)  # [B]
+  weight = torch.clamp(vel_norm, min=0.5)
+  cost = torch.sum(delta * weight, dim=1)
   if command_name is not None:
     command = env.command_manager.get_command(command_name)
     if command is not None:
