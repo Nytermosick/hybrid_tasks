@@ -21,7 +21,7 @@ G1_BASE_INERTIA = np.array([
 
 BASE_ACCEL_ACTION_SCALE = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
-CONTROL_DT = 0.01
+CONTROL_DT = 0.02
 
 GAIT_PERIOD = 0.8
 GAIT_OFFSET = [0, 0.5]
@@ -38,7 +38,7 @@ BASE_POS_KD    = np.array([1, 1, 1]) * 0
 BASE_ORIENT_KP = np.array([1, 1, 1]) * 50
 BASE_ORIENT_KD = np.array([1, 1, 1]) * 2
 
-FOOT_CLEARANCE = 0.15
+FOOT_CLEARANCE = 0.10
 BODY_HEIGHT_DESIRED = 0.75
 
 ##

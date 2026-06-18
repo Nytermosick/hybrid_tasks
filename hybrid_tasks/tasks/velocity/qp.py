@@ -256,14 +256,14 @@ def solveQP(
     # print("a_des:\n", a_des)
     # print("a_policy:\n", a_policy)
 
-    qfrc_bias = robot.data.data.qfrc_bias.clone()
-    qfrc_bias[:, :3] = 0.0
-    acc_dop = torch.linalg.solve(M[:, :6, :6].float(), qfrc_bias[:, :6].float())
-    acc_dop[:, 3:] = math_utils.quat_apply(qRwb, acc_dop[:, 3:])
+    # qfrc_bias = robot.data.data.qfrc_bias.clone()
+    # qfrc_bias[:, :3] = 0.0
+    # acc_dop = torch.linalg.solve(M[:, :6, :6].float(), qfrc_bias[:, :6].float())
+    # acc_dop[:, 3:] = math_utils.quat_apply(qRwb, acc_dop[:, 3:])
     
-    # gravity = qpcfg.gravity
-    # a = (a_des + gravity).unsqueeze(2)
-    a = (a_des + acc_dop).unsqueeze(2)
+    gravity = qpcfg.gravity
+    a = (a_des + gravity).unsqueeze(2)
+    # a = (a_des + acc_dop).unsqueeze(2)
     
     # print("a:", a)
     # print("a shape:", a.shape)
