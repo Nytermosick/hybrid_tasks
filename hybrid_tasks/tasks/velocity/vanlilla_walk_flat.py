@@ -176,9 +176,9 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
       heading_control_stiffness=0.5,
       debug_vis=True,
       ranges=UniformVelocityCommandCfg.Ranges(
-        lin_vel_x=(-1.1, 1.1), #(-1.0, 2.0),
-        lin_vel_y=(-0.3, 0.3), #(-1.0, 1.0),
-        ang_vel_z=(-1.5, 1.5), #(-1.5, 1.5),
+        lin_vel_x=(-1.0, 2.0),
+        lin_vel_y=(-1.0, 1.0),
+        ang_vel_z=(-1.0, 1.0),
         heading=(-math.pi, math.pi),
       ),
     )
@@ -274,7 +274,7 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
     "track_angular_velocity": RewardTermCfg(
       func=mdp.track_angular_velocity,
       weight=1.0,
-      params={"command_name": "twist", "std": math.sqrt(0.25)},
+      params={"command_name": "twist", "std": math.sqrt(0.5)},
     ),
     # "yaw_orientation_error_l2": RewardTermCfg(
     #   func=mdp.yaw_orientation_error_l2,
@@ -283,7 +283,7 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
     # ),
     "body_orientation_l2": RewardTermCfg(
       func=mdp.body_orientation_l2,
-      weight=-0.5,
+      weight=-1,
       params={"asset_cfg": SceneEntityCfg("robot", body_names=())},  # Set per-robot.
     ),
     "pose": RewardTermCfg(
@@ -301,18 +301,18 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
     "body_ang_vel": RewardTermCfg(
       func=mdp.body_angular_velocity_penalty,
-      weight=-0.025,  # Override per-robot
+      weight=-0.05,  # Override per-robot
       params={"asset_cfg": SceneEntityCfg("robot", body_names=())},  # Set per-robot.
     ),
     "angular_momentum": RewardTermCfg(
       func=mdp.angular_momentum_penalty,
-      weight=-0.05,  # Override per-robot
+      weight=-0.025,  # Override per-robot
       params={"sensor_name": "robot/root_angmom"},
     ),
     "is_terminated": RewardTermCfg(func=mdp.is_terminated, weight=-200.0),
     "joint_acc_l2": RewardTermCfg(func=mdp.joint_acc_l2, weight=-2.5e-7),
     "joint_pos_limits": RewardTermCfg(func=mdp.joint_pos_limits, weight=-10.0),
-    "action_rate_l2": RewardTermCfg(func=mdp.action_rate_l2, weight=-0.1),
+    "action_rate_l2": RewardTermCfg(func=mdp.action_rate_l2, weight=-0.05),
     "foot_gait": RewardTermCfg(
       func=mdp.feet_gait,
       weight=0.5,
@@ -392,42 +392,8 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
       params={
         "command_name": "twist",
         "velocity_stages": [
-          {
-            "step": 0,
-            "lin_vel_x": (-0.2, 0.2),
-            "lin_vel_y": (-0.05, 0.05),
-            "ang_vel_z": (-0.3, 0.3),
-          },
-          {
-            "step": 1000 * 24,
-            "lin_vel_x": (-0.4, 0.4),
-            "lin_vel_y": (-0.1, 0.1),
-            "ang_vel_z": (-0.6, 0.6),
-          },
-          {
-            "step": 2500 * 24,
-            "lin_vel_x": (-0.6, 0.6),
-            "lin_vel_y": (-0.15, 0.15),
-            "ang_vel_z": (-0.9, 0.9),
-          },
-          {
-            "step": 5000 * 24,
-            "lin_vel_x": (-0.8, 0.8),
-            "lin_vel_y": (-0.2, 0.2),
-            "ang_vel_z": (-1.1, 1.1),
-          },
-          {
-            "step": 8000 * 24,
-            "lin_vel_x": (-1.0, 1.0),
-            "lin_vel_y": (-0.25, 0.25),
-            "ang_vel_z": (-1.3, 1.3),
-          },
-          {
-            "step": 12000 * 24,
-            "lin_vel_x": (-1.1, 1.1),
-            "lin_vel_y": (-0.3, 0.3),
-            "ang_vel_z": (-1.5, 1.5),
-          },
+          {"step": 0, "lin_vel_x": (-0.5, 1.0), "lin_vel_y": (-0.5, 0.5), "ang_vel_z": (-1.0, 1.0)},
+          {"step": 5000 * 24, "lin_vel_x": (-1.0, 2.0), "lin_vel_y": (-1.0, 1.0)},
         ],
       },
     ),
@@ -474,6 +440,6 @@ def make_vanilla_walk_flat_env_cfg() -> ManagerBasedRlEnvCfg:
         jacobian="dense"
       ),
     ),
-    decimation=2,
+    decimation=4,
     episode_length_s=20.0,
   )
