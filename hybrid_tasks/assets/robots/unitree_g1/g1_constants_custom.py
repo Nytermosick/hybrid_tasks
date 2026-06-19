@@ -19,16 +19,15 @@ G1_BASE_INERTIA = np.array([
     [0.04, -0.001, 0.488],
 ])
 
-BASE_ACCEL_ACTION_SCALE = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+BASE_ACCEL_ACTION_SCALE = np.array([0.5, 0.5, 0.5, 0.25, 0.25, 0.25])
 
 CONTROL_DT = 0.02
-
 GAIT_PERIOD = 0.8
 GAIT_OFFSET = [0, 0.5]
 GAIT_THRESHOLD = 0.56  # phase < GAIT_THRESHOLD is stance (Stance part)
 STANCE_PERIOD = GAIT_THRESHOLD * GAIT_PERIOD
 COMMAND_STANDING_THRESHOLD = 0.1  # command norm below which the robot is considered standing
-QP_YAW_ERROR_LIMIT = 0.35  # rad, max yaw error sent to QP after desired heading integration
+QP_YAW_ERROR_LIMIT = 0.5  # rad, max yaw error sent to QP after desired heading integration
 
 F_MAX_Z = 600
 MU = 1.0
